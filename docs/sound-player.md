@@ -65,6 +65,7 @@ End With
 - `Volume`: Volume level for the sound (0-100) (Default: Empty)
 - `Loops`: Number of times to loop the sound (0 for infinite) (Default: Empty)
 - `Key`: Key to identify the sound for stopping (Default: Empty)
+- `Priority`: Overrides the sound's own priority for this play. When a sound bus is already playing its `SimultaneousSounds` limit, a new sound cuts off the lowest-priority sound playing (the oldest one on a tie) only if the new sound's priority is strictly higher; otherwise the new sound is not played (Default: Empty, uses the sound's priority)
 - `Debug`: Boolean to enable debug logging for this sound player (Default: False)
 
 ## Example Configurations
@@ -154,4 +155,5 @@ By default, sound players are configured with:
 - The `Key` property is used to identify sounds for stopping
 - The `Volume` property can be used to adjust the volume of sounds
 - The `Loops` property can be used to make sounds loop
+- The `Priority` property decides which sounds win when a sound bus is full
 - When a mode is deactivated, all sounds played by that mode are stopped 

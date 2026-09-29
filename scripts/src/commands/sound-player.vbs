@@ -121,7 +121,7 @@ End Function
 
 
 Class GlfSoundPlayerItem
-	Private m_sound, m_action, m_key, m_volume, m_loops, m_mode
+	Private m_sound, m_action, m_key, m_volume, m_loops, m_mode, m_priority
     
     Public Property Get Action(): Action = m_action: End Property
     Public Property Let Action(input): m_action = input: End Property
@@ -137,6 +137,9 @@ Class GlfSoundPlayerItem
 
     Public Property Get Mode(): Mode = m_mode: End Property
     Public Property Let Mode(input): m_mode = input: End Property
+
+    Public Property Get Priority(): Priority = m_priority: End Property
+    Public Property Let Priority(input): m_priority = input: End Property
 
     Public Property Get Sound()
         If IsNull(m_sound) Then
@@ -158,6 +161,7 @@ Class GlfSoundPlayerItem
         m_volume = Empty
         m_loops = Empty
         m_mode = mode
+        m_priority = Empty
         Set Init = Me
 	End Function
 
@@ -173,6 +177,9 @@ Class GlfSoundPlayerItem
         End If
         If Not IsEmpty(m_loops) Then
             yaml = yaml & "      loops: " & m_loops & vbCrLf
+        End If
+        If Not IsEmpty(m_priority) Then
+            yaml = yaml & "      priority: " & m_priority & vbCrLf
         End If
         ToYaml = yaml
     End Function
