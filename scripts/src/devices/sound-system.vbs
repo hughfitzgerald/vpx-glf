@@ -95,6 +95,7 @@ Class GlfSoundBus
 
     Public Sub StopSoundWithKey(sound_key)
         If m_current_sounds.Exists(sound_key) Then
+            RemoveDelay m_name & "_stop_sound_" & sound_key
             Dim sound_settings : Set sound_settings = m_current_sounds(sound_key)
             If Not IsEmpty(m_type) Then
                 If m_type = "bcp" Then
