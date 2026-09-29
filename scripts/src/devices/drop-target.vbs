@@ -56,6 +56,13 @@ Class GlfDroptarget
         Next
     End Property
 
+    Public Property Get GetValue(value)
+        Select Case value
+            Case "state", "complete":
+                GetValue = m_complete
+        End Select
+    End Property
+
     Public Property Let ActionCallback(value) : m_action_cb = value : End Property
 	Public Property Let KnockdownEvents(value)
 		Dim evt
