@@ -17,6 +17,7 @@ Class GlfSoundPlayer
         Dim newEvent : Set newEvent = (new GlfEvent)(name)
         m_events.Add newEvent.Raw, newEvent
         Dim new_sound : Set new_sound = (new GlfSoundPlayerItem)(m_mode)
+        new_sound.BasePriority = m_priority
         m_eventValues.Add newEvent.Raw, new_sound
         Set EventName = new_sound
         
@@ -121,7 +122,7 @@ End Function
 
 
 Class GlfSoundPlayerItem
-	Private m_sound, m_action, m_key, m_volume, m_loops, m_mode, m_priority
+	Private m_sound, m_action, m_key, m_volume, m_loops, m_mode, m_priority, m_base_priority
     
     Public Property Get Action(): Action = m_action: End Property
     Public Property Let Action(input): m_action = input: End Property
@@ -140,6 +141,20 @@ Class GlfSoundPlayerItem
 
     Public Property Get Priority(): Priority = m_priority: End Property
     Public Property Let Priority(input): m_priority = input: End Property
+
+    Public Property Get BasePriority(): BasePriority = m_base_priority: End Property
+    Public Property Let BasePriority(input): m_base_priority = input: End Property
+
+    'Same as MPF: this item's priority plus the mode's priority, or the sound's own priority if that comes to 0
+    Public Property Get PlayPriority()
+        Dim p : p = m_base_priority
+        If Not IsEmpty(m_priority) Then p = p + m_priority
+        If p <> 0 Then
+            PlayPriority = p
+        Else
+            PlayPriority = Sound.Priority
+        End If
+    End Property
 
     Public Property Get Sound()
         If IsNull(m_sound) Then
@@ -162,6 +177,7 @@ Class GlfSoundPlayerItem
         m_loops = Empty
         m_mode = mode
         m_priority = Empty
+        m_base_priority = 0
         Set Init = Me
 	End Function
 

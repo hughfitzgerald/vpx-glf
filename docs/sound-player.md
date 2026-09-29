@@ -65,7 +65,7 @@ End With
 - `Volume`: Volume level for the sound (0-100) (Default: Empty)
 - `Loops`: Number of times to loop the sound (0 for infinite) (Default: Empty)
 - `Key`: Key to identify the sound for stopping (Default: Empty)
-- `Priority`: Overrides the sound's own priority for this play. When a sound bus is already playing its `SimultaneousSounds` limit, a new sound cuts off the lowest-priority sound playing (the oldest one on a tie) only if the new sound's priority is strictly higher; otherwise the new sound is not played (Default: Empty, uses the sound's priority)
+- `Priority`: Added to the mode's priority to give the priority this sound plays at, as in MPF. If the total is 0, the sound's own priority is used instead. When a sound bus is already playing its `SimultaneousSounds` limit, a new sound cuts off the lowest-priority sound playing (the oldest one on a tie) only if its priority is strictly higher; otherwise the new sound is not played. Unlike MPF, sounds are not queued (Default: Empty)
 - `Debug`: Boolean to enable debug logging for this sound player (Default: False)
 
 ## Example Configurations
@@ -156,4 +156,5 @@ By default, sound players are configured with:
 - The `Volume` property can be used to adjust the volume of sounds
 - The `Loops` property can be used to make sounds loop
 - The `Priority` property decides which sounds win when a sound bus is full
+- Sounds played from shows use `Priority` if set, otherwise the sound's own priority (the show and mode priorities are not added)
 - When a mode is deactivated, all sounds played by that mode are stopped 

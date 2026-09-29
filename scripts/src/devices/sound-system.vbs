@@ -116,14 +116,6 @@ Class GlfSoundBus
         End If
     End Sub
 
-    Private Function EffectivePriority(settings)
-        If Not IsEmpty(settings.Priority) Then
-            EffectivePriority = settings.Priority
-        Else
-            EffectivePriority = settings.Sound.Priority
-        End If
-    End Function
-
     Private Function CanPlay(sound_settings)
         CanPlay = True
         'Replaying a sound that is already on the bus doesn't take a new slot
@@ -134,14 +126,14 @@ Class GlfSoundBus
         Dim key, p, lowest_key, lowest_priority
         lowest_key = Empty
         For Each key In m_current_sounds.Keys
-            p = EffectivePriority(m_current_sounds(key))
+            p = m_current_sounds(key).PlayPriority
             If IsEmpty(lowest_key) Or p < lowest_priority Then
                 lowest_key = key
                 lowest_priority = p
             End If
         Next
 
-        If EffectivePriority(sound_settings) > lowest_priority Then
+        If sound_settings.PlayPriority > lowest_priority Then
             StopSoundWithKey lowest_key   'cut it off to make room
         Else
             CanPlay = False
