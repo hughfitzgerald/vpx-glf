@@ -192,7 +192,12 @@ Class GlfBallHold
             DispatchPinEvent m_name & "_full", kwargs
         End If
 
-        m_hold_queue.Add device, unclaimed_balls
+        'One entry per device: a second ball held in the same device adds to its count
+        If m_hold_queue.Exists(device) Then
+            m_hold_queue(device) = m_hold_queue(device) + balls_to_hold
+        Else
+            m_hold_queue.Add device, balls_to_hold
+        End If
 
         HoldBall = unclaimed_balls - balls_to_hold
     End Function
@@ -238,7 +243,9 @@ Class GlfBallHold
                 balls = remaining_balls_to_release
             End If
 
-            deviceControl.EjectBalls balls
+            If balls > 0 Then
+                deviceControl.EjectBalls balls
+            End If
             balls_released = balls_released + balls
             remaining_balls_to_release = remaining_balls_to_release - balls
             If remaining_balls_to_release <= 0 Then
