@@ -46,6 +46,7 @@ Class GlfBallDevice
     End Property
     
     Public Property Get Balls(): Balls = m_balls_in_device : End Property
+    Public Property Get Capacity(): Capacity = UBound(m_ball_switches) + 1 : End Property
 
     Public Property Let AddIncomingBalls(value) : m_incoming_balls = m_incoming_balls + value : End Property
     Public Property Get IncomingBalls() : IncomingBalls = m_incoming_balls : End Property
