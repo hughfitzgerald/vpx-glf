@@ -36,6 +36,12 @@ Enable `.Debug = True` on the mode and the component being investigated where th
 
 The example table's watcher concatenates `.vbs` changes; it does not convert show YAML. Its production concatenation also includes `cached-functions.vbs`. Use the development workflow while changing expressions, and check the cache/build process if the generated script does not reflect the intended change.
 
+## Ball audit
+
+With debug logging enabled, GLF checks every two seconds during a game that `glf_BIP` agrees with where the balls are: total balls, minus balls in the trough, the drain and any multiball lock device. Balls in the plunger lane, on the playfield and in ball holds count as in play.
+
+A disagreement that persists for two checks is logged once under the label `Ball Audit` as `MISMATCH`, with the count from each ball device. `OK again` is logged when the counts agree again. The audit never changes game state. Source: `scripts/src/ball-audit.vbs`.
+
 ## Verify cleanup and player boundaries
 
 After fixing the normal path, exercise timeout, mode cancellation, tilt, drain, next player and a new game. Look for timers still posting events, repeating shows or sounds, held balls, stale shot states and duplicate listeners. A successful first hit is not enough to establish a feature's lifecycle.
