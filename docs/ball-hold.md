@@ -24,7 +24,7 @@ Dark Chaos uses this pattern in `scripts/src/game/modes/base.vbs` with `scoop_ho
 
 | Property | Meaning / default |
 | --- | --- |
-| `BallsToHold` | Capacity across the configured hold devices; default 0, so set it explicitly |
+| `BallsToHold` | Number of balls the hold keeps; default is the combined capacity (ball switch count) of the hold devices |
 | `HoldDevices` | Array of registered ball-device names; default empty |
 | `EnableEvents` | Enable the hold on these events; without any, mode activation enables it |
 | `DisableEvents` | Disable and release all held balls |

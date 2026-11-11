@@ -4000,11 +4000,26 @@ Class GlfBallHold
     Public Function RemainingSpaceInHold()
         'Return the remaining capacity of the hold.
         Dim balls
-        balls = m_balls_to_hold - m_balls_held
+        balls = HoldCapacity() - m_balls_held
         If balls < 0 Then
             balls = 0
         End If
         RemainingSpaceInHold = balls
+    End Function
+
+    Public Function HoldCapacity()
+        'BallsToHold if set; otherwise the combined capacity of the hold devices, as in MPF
+        If m_balls_to_hold > 0 Then
+            HoldCapacity = m_balls_to_hold
+            Exit Function
+        End If
+        Dim device, capacity : capacity = 0
+        For Each device in m_hold_devices
+            If glf_ball_devices.Exists(device) Then
+                capacity = capacity + glf_ball_devices(device).Capacity
+            End If
+        Next
+        HoldCapacity = capacity
     End Function
 
     Public Function HoldBall(device, unclaimed_balls)        
@@ -13676,6 +13691,7 @@ Class GlfBallDevice
     End Property
     
     Public Property Get Balls(): Balls = m_balls_in_device : End Property
+    Public Property Get Capacity(): Capacity = UBound(m_ball_switches) + 1 : End Property
 
     Public Property Let AddIncomingBalls(value) : m_incoming_balls = m_incoming_balls + value : End Property
     Public Property Get IncomingBalls() : IncomingBalls = m_incoming_balls : End Property
