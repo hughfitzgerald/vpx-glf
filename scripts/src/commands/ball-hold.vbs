@@ -162,7 +162,7 @@ Class GlfBallHold
         End If
 
         If unclaimed_balls <= 0 Then
-            HoldBalls = unclaimed_balls
+            HoldBall = unclaimed_balls
             Exit Function
         End If
 
