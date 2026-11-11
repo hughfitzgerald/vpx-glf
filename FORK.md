@@ -108,3 +108,7 @@ git cherry-pick <commit id>
 | `feat/drop-target-getvalue` | `state` / `complete` placeholder values on drop targets |
 | `fix/sound-stop-timer` | Clear the pending stop timer when a sound is stopped |
 | `fix/trough-elseif` | Fix unclosed `Else If` blocks from the P3 trough change (table fails to compile without it) |
+| `feat/debug-ball-audit` | Debug-only check that `glf_BIP` matches where the balls are |
+| `fix/ball-hold-queue-duplicate-key` | Second ball held in the same device raised an error |
+| `fix/ball-hold-return-typo` | Hold returned Empty instead of the unclaimed count |
+| `fix/ball-hold-default-capacity` | `BallsToHold` defaults to the hold devices' capacity |
