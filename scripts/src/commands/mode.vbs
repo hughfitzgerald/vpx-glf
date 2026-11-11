@@ -532,6 +532,14 @@ Class Mode
             Next
         End If
 
+        If UBound(m_counters.Keys)>-1 Then
+            yaml = yaml & vbCrLf
+            yaml = yaml & "counters: " & vbCrLf
+            For Each child in m_counters.Keys
+                yaml = yaml & m_counters(child).ToYaml
+            Next
+        End If
+
         If UBound(m_eventplayer.Events.Keys)>-1 Then
             yaml = yaml & vbCrLf
             yaml = yaml & "event_player: " & vbCrLf
