@@ -107,3 +107,4 @@ git cherry-pick <commit id>
 | `feat/sound-priority` | Priority-based cut-off on sound buses, with mode priority |
 | `feat/drop-target-getvalue` | `state` / `complete` placeholder values on drop targets |
 | `fix/sound-stop-timer` | Clear the pending stop timer when a sound is stopped |
+| `fix/trough-elseif` | Fix unclosed `Else If` blocks from the P3 trough change (table fails to compile without it) |
