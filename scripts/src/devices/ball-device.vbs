@@ -23,6 +23,8 @@ Class GlfBallDevice
     Private m_eject_targets
     Private m_entrance_count_delay
     Private m_incoming_balls
+    Private m_entering
+    Private m_empty_eject_retries
     Private m_lost_balls
     Private m_exclude_from_ball_search
     Private m_auto_fire_on_unexpected_ball
@@ -84,9 +86,11 @@ Class GlfBallDevice
     Public Property Let BallSwitches(value)
         m_ball_switches = value
         ReDim m_balls(Ubound(m_ball_switches))
+        ReDim m_entering(Ubound(m_ball_switches))
         Dim x
         For x=0 to UBound(m_ball_switches)
             m_balls(x) = Null
+            m_entering(x) = False
             AddPinEventListener m_ball_switches(x)&"_active", m_name & "_ball_enter", "BallDeviceEventHandler", 1000, Array("ball_entering", Me, x)
             AddPinEventListener m_ball_switches(x)&"_inactive", m_name & "_ball_exiting", "BallDeviceEventHandler", 1000, Array("ball_exiting", Me, x)
         Next
@@ -118,6 +122,8 @@ Class GlfBallDevice
         m_eject_enable_time = 0
         m_entrance_count_delay = 500
         m_incoming_balls = 0
+        m_entering = Array()
+        m_empty_eject_retries = 0
         m_exclude_from_ball_search = False
         m_auto_fire_on_unexpected_ball = True
         glf_ball_devices.Add name, Me
@@ -127,13 +133,29 @@ Class GlfBallDevice
     Public Sub BallEntering(ball, switch)
         Log "Ball Entering" 
         If m_default_device = False Then
+            m_entering(switch) = True
             SetDelay m_name & "_" & switch & "_ball_enter", "BallDeviceEventHandler", Array(Array("ball_enter", Me, switch), ball), m_entrance_count_delay
         Else
             BallEnter ball, switch
         End If
     End Sub
 
+    Public Sub BallEnterCancelled(switch)
+        'The ball left again before the entrance count delay ran out
+        m_entering(switch) = False
+    End Sub
+
+    Private Function BallsEntering()
+        Dim x : BallsEntering = 0
+        For x = 0 to UBound(m_entering)
+            If m_entering(x) = True Then
+                BallsEntering = BallsEntering + 1
+            End If
+        Next
+    End Function
+
     Public Sub BallEnter(ball, switch)
+        m_entering(switch) = False
         RemoveDelay m_name & "_switch" & switch & "_eject_timeout"
         If m_ejecting = True And switch = 0 Then
             'A ball is back on the eject switch before the eject was confirmed, so that eject is over.
@@ -194,8 +216,9 @@ Class GlfBallDevice
         Log "Ball successfully exited"
         RemoveDelay m_name & "_eject_attempt"
         If m_ejecting_all = True Then
-            If m_balls_to_eject = 0 Then
+            If m_balls_to_eject <= 0 Then
                 m_ejecting_all = False
+                m_balls_to_eject = 0
                 Exit Sub
             End If
             If Not IsNull(m_balls(0)) Then
@@ -222,10 +245,34 @@ Class GlfBallDevice
     End Sub
 
     Public Sub Eject
-        
+        m_empty_eject_retries = 0
+        DoEject
+    End Sub
+
+    'Called 600ms after an eject request found no ball on the eject switch.
+    Public Sub EjectRetry
+        If m_balls_in_device = 0 And BallsEntering() = 0 And m_incoming_balls = 0 Then
+            'Nothing here and nothing on its way. Allow a few seconds for a ball that is
+            'about to arrive, then drop the request so it cannot eject some later ball.
+            m_empty_eject_retries = m_empty_eject_retries + 1
+            If m_empty_eject_retries >= 5 Then
+                Log "Eject request dropped, device is empty"
+                m_empty_eject_retries = 0
+                m_ejecting_all = False
+                m_balls_to_eject = 0
+                Exit Sub
+            End If
+        Else
+            m_empty_eject_retries = 0
+        End If
+        DoEject
+    End Sub
+
+    Private Sub DoEject
         If Not IsNull(m_eject_callback) Then
             If Not IsNull(m_balls(0)) Then
                 Log "Ejecting."
+                m_empty_eject_retries = 0
                 DispatchPinEvent m_name & "_ejecting_ball", Null
                 DispatchQueuePinEvent m_name & "_ball_eject_attempt", Null
                 SetDelay m_name & "_switch0_eject_timeout", "BallDeviceEventHandler", Array(Array("eject_timeout", Me), m_balls(0)), m_eject_timeout
@@ -236,7 +283,7 @@ Class GlfBallDevice
                     SetDelay m_name & "_eject_enable_time", "BallDeviceEventHandler", Array(Array("eject_enable_complete", Me), m_balls(0)), m_eject_enable_time
                 End If
             Else
-                SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject", Me), Null), 600
+                SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject_retry", Me), Null), 600
             End If
         End If
     End Sub
@@ -249,6 +296,9 @@ Class GlfBallDevice
 
     Public Sub EjectBalls(balls)
         Log "Ejecting "&balls&" Balls."
+        If balls <= 0 Then
+            Exit Sub
+        End If
         m_ejecting_all = True
         m_balls_to_eject = balls - 1
         Eject()
@@ -257,7 +307,11 @@ Class GlfBallDevice
     Public Sub EjectAll
         Log "Ejecting All." 
         m_ejecting_all = True
-        m_balls_to_eject = m_balls_in_device - 1 
+        'Count a ball that has hit the switch but is still inside its entrance count delay
+        m_balls_to_eject = m_balls_in_device + BallsEntering() - 1
+        If m_balls_to_eject < 0 Then
+            m_balls_to_eject = 0
+        End If
         Eject()
     End Sub
 
@@ -315,6 +369,8 @@ Function BallDeviceEventHandler(args)
             ballDevice.BallEnter ball, switch
         Case "ball_eject"
             ballDevice.Eject
+        Case "ball_eject_retry"
+            ballDevice.EjectRetry
         Case "ball_eject_all"
             ballDevice.EjectAll
         Case "ball_exiting"
@@ -322,6 +378,8 @@ Function BallDeviceEventHandler(args)
             If RemoveDelay(ballDevice.Name & "_" & switch & "_ball_enter") = False Then
                 Set ball = args(1)
                 ballDevice.BallExiting ball, switch
+            Else
+                ballDevice.BallEnterCancelled switch
             End If
         Case "eject_timeout"
             Set ball = args(1)
