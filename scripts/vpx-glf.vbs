@@ -8383,11 +8383,15 @@ Class GlfMultiballs
         'eject balls from locks
         Dim ball_lock
         For Each ball_lock in m_ball_locks
+            'Take only as many locked balls as this multiball still needs. Any others stay locked.
             Dim available_balls : available_balls = glf_ball_devices(ball_lock).Balls()
-            If available_balls > 0 Then
-                glf_ball_devices(ball_lock).EjectAll()
+            If available_balls > m_balls_added_live - balls_added Then
+                available_balls = m_balls_added_live - balls_added
             End If
-            balls_added = balls_added + available_balls
+            If available_balls > 0 Then
+                glf_ball_devices(ball_lock).EjectBalls available_balls
+                balls_added = balls_added + available_balls
+            End If
         Next
         Log "Balls added: " & balls_added
         glf_BIP = m_balls_live_target
