@@ -1,7 +1,7 @@
 # GLF test bed
 
-An automated test table for GLF. It runs inside Visual Pinball, but it has no
-playfield parts: the trough, the plunger lane and every ball device are script
+An automated test table for GLF. It runs inside Visual Pinball, or without it
+in about a second, and it has no playfield parts: the trough, the plunger lane and every ball device are script
 objects. Balls go exactly where a test sends them, so nothing depends on
 physics and a failed eject or an escaping ball can be produced on demand.
 
@@ -20,9 +20,30 @@ scenario as it finishes. It exits with an error if any scenario fails.
 Visual Pinball is found through the `VPINBALL` environment variable, or at
 `/Applications/VPinballX_BGFX.app/Contents/MacOS/VPinballX_BGFX`.
 
+### Without Visual Pinball
+
+```
+npm run test:headless
+```
+
+This runs the same script in `glftest_host`, a small program built on
+[libwinevbs](https://github.com/vpinball/libwinevbs), the VBScript engine
+Visual Pinball standalone uses on macOS and Linux. Time is simulated, so the
+whole suite takes a second or two and no window opens.
+
+The first run fetches and builds libwinevbs into `tests/.work`, which needs
+git, cmake, bison and a C compiler (`brew install cmake bison` on macOS;
+`sudo apt install cmake bison build-essential` on Linux). Set `LIBWINEVBS_DIR`
+to use a checkout you already have. Every option below works with it, for
+example `npm run test:headless -- --only hold_basic`.
+
+GitHub runs the headless suite on every push to a branch that contains the
+test bed; see `.github/workflows/test-bed.yml`.
+
 | Command | What it does |
 | --- | --- |
-| `npm test` | Run every scenario |
+| `npm test` | Run every scenario in Visual Pinball |
+| `npm run test:headless` | Run every scenario without Visual Pinball |
 | `npm test -- --only hold_basic,smoke_game` | Run the named scenarios |
 | `npm test -- --isolate` | Restart Visual Pinball for each scenario |
 | `npm test -- --list` | List scenario names |
@@ -33,8 +54,8 @@ Visual Pinball is found through the `VPINBALL` environment variable, or at
 To show that a fix works, run the same scenario on two branches: it should fail
 without the fix and pass with it.
 
-If a run stops early, Visual Pinball's own output is in
-`tests/.work/vpx-output.log`.
+If a run stops early, the player's own output, including any script errors,
+is in `tests/.work/vpx-output.log`.
 
 ## How it is put together
 
@@ -48,6 +69,8 @@ If a run stops early, Visual Pinball's own output is in
 | `src/scenarios/` | One file per scenario, run in file-name order |
 | `src/90_table.vbs` | Table events |
 | `run-tests.js` | The launcher behind `npm test` |
+| `headless/host.c` | `glftest_host`: embeds libwinevbs and supplies `gametime`, `Table1` and a print function |
+| `headless/prelude.vbs` | Stand-ins for the other things Visual Pinball provides |
 
 GLF sees an ordinary table. `swTrough1` to `swTrough5` and `Drain` are script
 objects that answer the calls GLF makes on trough kickers. Ball device switches
@@ -140,6 +163,9 @@ not fixed yet. It is reported, but does not fail the run.
 
 - The trough and devices are simulated, so this tests GLF's logic, not kicker
   geometry or physics.
+- The headless runner uses the engine Visual Pinball standalone uses. On
+  Windows, Visual Pinball uses Microsoft's VBScript engine, which can differ in
+  small ways; `npm test` there is the final check.
 - Scenarios share one Visual Pinball session by default. After each one the
   runner cancels the game and sends every ball home, but a bug can leave GLF in
   a state that affects later scenarios. The runner notes when that happens; use

@@ -31,7 +31,7 @@ Const TB_QUIET_MS = 3500            'quiet time after cleanup; longer than GLF's
 Const TB_PRELUDE_STEPS = 4          'steps used by TB_OneBallInPlay
 
 Dim tb_scenarios : Set tb_scenarios = CreateObject("Scripting.Dictionary")   'name -> known issue text, or ""
-Dim tb_watch     : Set tb_watch     = CreateObject("Scripting.Dictionary")   'event name -> times seen
+Dim tb_watched     : Set tb_watched     = CreateObject("Scripting.Dictionary")   'event name -> times seen
 Dim tb_phase : tb_phase = "boot"
 Dim tb_index : tb_index = -1
 Dim tb_current : tb_current = ""
@@ -40,8 +40,8 @@ Dim tb_wait_until : tb_wait_until = 0
 Dim tb_cond : tb_cond = ""
 Dim tb_cond_label : tb_cond_label = ""
 Dim tb_cond_deadline : tb_cond_deadline = 0
-Dim tb_pass : tb_pass = 0
-Dim tb_fail : tb_fail = 0
+Dim tb_pass_count : tb_pass_count = 0
+Dim tb_fail_count : tb_fail_count = 0
 Dim tb_started_at : tb_started_at = 0
 Dim tb_scenarios_run : tb_scenarios_run = 0
 Dim tb_scenarios_failed : tb_scenarios_failed = 0
@@ -81,17 +81,17 @@ End Sub
 
 'Count how many times GLF posts an event. Read the count with TB_Seen.
 Sub TB_Watch(event_name)
-    If tb_watch.Exists(event_name) Then
-        tb_watch(event_name) = 0
+    If tb_watched.Exists(event_name) Then
+        tb_watched(event_name) = 0
     Else
-        tb_watch.Add event_name, 0
+        tb_watched.Add event_name, 0
         AddPinEventListener event_name, "tb_watch_" & event_name, "TB_WatchHandler", 1, event_name
     End If
 End Sub
 
 Function TB_Seen(event_name)
-    If tb_watch.Exists(event_name) Then
-        TB_Seen = tb_watch(event_name)
+    If tb_watched.Exists(event_name) Then
+        TB_Seen = tb_watched(event_name)
     Else
         TB_Seen = 0
     End If
@@ -99,7 +99,7 @@ End Function
 
 Function TB_WatchHandler(args)
     Dim event_name : event_name = args(0)
-    tb_watch(event_name) = tb_watch(event_name) + 1
+    tb_watched(event_name) = tb_watched(event_name) + 1
     If IsObject(args(1)) Then
         Set TB_WatchHandler = args(1)
     Else
@@ -203,12 +203,12 @@ Function TB_StateLine()
 End Function
 
 Sub TB_Pass(label)
-    tb_pass = tb_pass + 1
+    tb_pass_count = tb_pass_count + 1
     TB_Log "TB|PASS|" & tb_current & "|" & TB_Clean(label)
 End Sub
 
 Sub TB_Fail(label, detail)
-    tb_fail = tb_fail + 1
+    tb_fail_count = tb_fail_count + 1
     TB_Log "TB|FAIL|" & tb_current & "|" & TB_Clean(label) & "|" & TB_Clean(detail)
 End Sub
 
@@ -332,8 +332,8 @@ Sub TB_NextScenario()
 
     tb_current = names(tb_index)
     tb_step = 0
-    tb_pass = 0
-    tb_fail = 0
+    tb_pass_count = 0
+    tb_fail_count = 0
     tb_cond = ""
     tb_wait_until = gametime
     tb_started_at = gametime
@@ -478,7 +478,7 @@ Sub TB_CleanupStep()
                     TB_Note "After cleanup GLF still counts " & glf_ball_devices(device_name).Balls & " balls in " & device_name & ". Later scenarios may be affected; rerun them alone with --only."
                 End If
             Next
-            If tb_fail = 0 Then
+            If tb_fail_count = 0 Then
                 verdict = "passed"
             ElseIf tb_scenarios(tb_current) <> "" Then
                 verdict = "known"
@@ -487,7 +487,7 @@ Sub TB_CleanupStep()
                 tb_scenarios_failed = tb_scenarios_failed + 1
             End If
             tb_scenarios_run = tb_scenarios_run + 1
-            TB_Log "TB|END|" & tb_current & "|" & verdict & "|" & tb_pass & "|" & tb_fail & "|" & (gametime - tb_started_at)
+            TB_Log "TB|END|" & tb_current & "|" & verdict & "|" & tb_pass_count & "|" & tb_fail_count & "|" & (gametime - tb_started_at)
             tb_phase = "next"
     End Select
 End Sub

@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node ../tests/run-tests.js",
+    "test:headless": "node ../tests/run-tests.js --headless",
     "script-watcher": "grunt watch:vpx"
   },
   "author": "",
