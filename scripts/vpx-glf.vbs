@@ -3005,17 +3005,49 @@ Class GlfBallSearch
         If glf_gameStarted = True And glf_BIP > 0 And (glf_BIP-held_balls)>0 And glf_plunger.HasBall() = False Then
             m_phase = phase
             glf_last_switch_hit_time = 0
-            'Fire all auto fire devices, slings, pops.
-            m_devices = glf_autofiredevices.Items()
-            m_current_device_type = "autofire"
             DispatchPinEvent "ball_search_started", Null
-            If UBound(m_devices) > -1 Then
-                m_devices(0).BallSearch(m_phase)
-                SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, 0), Null), m_search_interval.Value
-            End If
+            'Fire all auto fire devices, slings, pops, then the other device types in turn.
+            m_current_device_type = "start"
+            NextDeviceType
         Else
             SetDelay "ball_search" , "BallSearchHandler", Array(Array("start", Me), Null), m_timeout.Value
         End If
+    End Sub
+
+    'Moves on to the next type of device that has something to search. A table with no
+    'devices of some type skips it; before, the search stopped there without finishing.
+    Private Sub NextDeviceType()
+        Do
+            Select Case m_current_device_type
+                Case "start"
+                    m_devices = glf_autofiredevices.Items()
+                    m_current_device_type = "autofire"
+                Case "autofire"
+                    m_devices = glf_ball_devices.Items()
+                    m_current_device_type = "balldevices"
+                Case "balldevices"
+                    m_devices = glf_drop_targets.Items()
+                    m_current_device_type = "droptargets"
+                Case "droptargets"
+                    m_devices = glf_diverters.Items()
+                    m_current_device_type = "diverters"
+                Case Else
+                    'Every type has been searched in this phase
+                    m_current_device_type = Empty
+                    If m_phase < 3 Then
+                        Start m_phase+1
+                    Else
+                        m_phase = 0
+                        SetDelay "ball_search" , "BallSearchHandler", Array(Array("start", Me), Null), m_timeout.Value
+                    End If
+                    Exit Sub
+            End Select
+            If UBound(m_devices) > -1 Then
+                m_devices(0).BallSearch(m_phase)
+                SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, 0), Null), m_search_interval.Value
+                Exit Sub
+            End If
+        Loop
     End Sub
 
     Public Sub NextDevice(device_index)
@@ -3023,36 +3055,7 @@ Class GlfBallSearch
             m_devices(device_index+1).BallSearch(m_phase)
             SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, device_index+1), Null), m_search_interval.Value
         Else
-            If m_current_device_type = "autofire" Then
-                m_devices = glf_ball_devices.Items()
-                m_current_device_type = "balldevices"
-                If UBound(m_devices) > -1 Then
-                    m_devices(0).BallSearch(m_phase)
-                    SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, 0), Null), m_search_interval.Value
-                End If
-            ElseIf m_current_device_type = "balldevices" Then
-                m_devices = glf_drop_targets.Items()
-                m_current_device_type = "droptargets"
-                If UBound(m_devices) > -1 Then
-                    m_devices(0).BallSearch(m_phase)
-                    SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, 0), Null), m_search_interval.Value
-                End If
-            ElseIf m_current_device_type = "droptargets" Then
-                m_devices = glf_diverters.Items()
-                m_current_device_type = "diverters"
-                If UBound(m_devices) > -1 Then
-                    m_devices(0).BallSearch(m_phase)
-                    SetDelay "ball_search_next_device" , "BallSearchHandler", Array(Array("next_device", Me, 0), Null), m_search_interval.Value
-                End If
-            Else
-                m_current_device_type = Empty
-                If m_phase < 3 Then
-                    Start m_phase+1
-                Else
-                    m_phase = 0
-                    SetDelay "ball_search" , "BallSearchHandler", Array(Array("start", Me), Null), m_timeout.Value
-                End If
-            End If
+            NextDeviceType
         End If
     End Sub
 
