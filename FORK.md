@@ -115,3 +115,4 @@ git cherry-pick <commit id>
 | `fix/ball-device-failed-eject` | Device no longer sticks in its ejecting state when a kicked ball comes back |
 | `fix/ball-device-confirm-switch` | Eject target switch only confirms an eject that is in progress |
 | `fix/ball-device-eject-empty` | Eject request on an empty device is dropped after 3s instead of ejecting a later ball |
+| `feat/test-bed` | Automated test table under `tests/`; run it with `npm test` in `scripts/` (see `tests/README.md`) |
