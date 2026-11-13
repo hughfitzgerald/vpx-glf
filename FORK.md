@@ -112,3 +112,6 @@ git cherry-pick <commit id>
 | `fix/ball-hold-queue-duplicate-key` | Second ball held in the same device raised an error |
 | `fix/ball-hold-return-typo` | Hold returned Empty instead of the unclaimed count |
 | `fix/ball-hold-default-capacity` | `BallsToHold` defaults to the hold devices' capacity |
+| `fix/ball-device-failed-eject` | Device no longer sticks in its ejecting state when a kicked ball comes back |
+| `fix/ball-device-confirm-switch` | Eject target switch only confirms an eject that is in progress |
+| `fix/ball-device-eject-empty` | Eject request on an empty device is dropped after 3s instead of ejecting a later ball |
