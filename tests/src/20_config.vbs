@@ -17,6 +17,13 @@ End Sub
 
 Sub ConfigureGlfDevices()
 
+    'Ball search never starts on its own here; a scenario starts one with glf_ballsearch.Start 1
+    With EnableGlfBallSearch()
+        .Timeout = 3600000
+        .SearchInterval = 100
+        .BallSearchWaitAfterIteration = 1000
+    End With
+
     '*********** DEVICES ***********
 
     'Plunger lane. Set up like a table with a manual plunger that can also auto-launch.
@@ -119,6 +126,30 @@ Sub ConfigureGlfDevices()
             .LockDevices = Array("lock")
             .BallsToLock = 2
             .BallsToReplace = 2
+        End With
+    End With
+
+    'Two-ball multiball from the trough with a long shoot-again window
+    With CreateGlfMode("tb_mb_sa", 410)
+        .StartEvents = Array("tb_enable_mb_sa")
+        .StopEvents = Array("tb_disable_mb_sa")
+        With .Multiballs("mb_sa")
+            .StartEvents = Array("tb_start_mb_sa")
+            .BallCount = 2
+            .BallCountType = "total"
+            .ShootAgain = 20000
+        End With
+    End With
+
+    'Three-ball multiball from the trough, no shoot again
+    With CreateGlfMode("tb_mb3", 420)
+        .StartEvents = Array("tb_enable_mb3")
+        .StopEvents = Array("tb_disable_mb3")
+        With .Multiballs("mb3")
+            .StartEvents = Array("tb_start_mb3")
+            .BallCount = 3
+            .BallCountType = "total"
+            .ShootAgain = 0
         End With
     End With
 
