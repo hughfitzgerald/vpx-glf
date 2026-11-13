@@ -1,0 +1,10 @@
+{
+  "$type": "manifest",
+  "file_format": "vpinball-pack",
+  "file_version": 1,
+  "name": "GLF Test Bed",
+  "author": "vpx-glf",
+  "version": "0.1.0",
+  "description": "Automated test table for the Game Logic Framework. Has no playfield parts: every ball device is simulated in script.",
+  "save_date": "Thu Nov 12 00:00:00 2026"
+}
