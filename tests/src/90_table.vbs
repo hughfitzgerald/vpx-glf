@@ -6,6 +6,8 @@ Sub Table1_Init
     TB_BuildVirtualTable
     ConfigureGlfDevices
     Glf_Init(Table1)
+    'Cancel the ball search GLF schedules at start-up, so only scenarios start one
+    glf_ballsearch.StopBallSearch
 End Sub
 
 Sub Table1_Exit

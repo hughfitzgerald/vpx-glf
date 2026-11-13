@@ -157,7 +157,12 @@ not fixed yet. It is reported, but does not fail the run.
 | `tb_hold` | `tb_start_hold` | One-ball hold on `scoop`; release with `tb_release_hold` |
 | `tb_hold2` | `tb_start_hold2` | Two-ball hold on `lock`; release with `tb_release_hold2` |
 | `tb_lock` | `tb_start_lock` | Two-ball multiball lock on `lock` |
-| `tb_mb` | `tb_enable_mb` | Two-ball multiball; start it with `tb_start_mb` |
+| `tb_mb` | `tb_enable_mb` | Two-ball multiball fed from `lock`, then the trough; start it with `tb_start_mb` |
+| `tb_mb_sa` | `tb_enable_mb_sa` | Two-ball multiball with a 20-second shoot-again window; start it with `tb_start_mb_sa` |
+| `tb_mb3` | `tb_enable_mb3` | Three-ball multiball; start it with `tb_start_mb3` |
+
+Ball search is enabled but never starts on its own. A scenario starts one with
+`glf_ballsearch.Start 1`.
 
 ## Limits
 
