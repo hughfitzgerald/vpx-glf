@@ -418,7 +418,7 @@ End Sub
 
 'Sends every ball home through GLF, so that GLF's own counts return to zero
 Sub TB_CleanupStep()
-    Dim device_name, ball, device, stagger, verdict
+    Dim device_name, ball, device, stagger, verdict, hold_name
 
     If gametime < tb_cleanup_until Then
         Exit Sub
@@ -476,6 +476,11 @@ Sub TB_CleanupStep()
             For Each device_name In tb_devices.Keys()
                 If glf_ball_devices(device_name).Balls <> 0 Then
                     TB_Note "After cleanup GLF still counts " & glf_ball_devices(device_name).Balls & " balls in " & device_name & ". Later scenarios may be affected; rerun them alone with --only."
+                End If
+            Next
+            For Each hold_name In glf_ball_holds.Keys()
+                If glf_ball_holds(hold_name).GetValue("balls_held") <> 0 Then
+                    TB_Note "After cleanup hold " & hold_name & " still counts " & glf_ball_holds(hold_name).GetValue("balls_held") & " balls. Later scenarios may be affected."
                 End If
             Next
             If tb_fail_count = 0 Then
