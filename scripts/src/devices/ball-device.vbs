@@ -246,6 +246,8 @@ Class GlfBallDevice
             If m_balls_to_eject > m_balls_in_device Then
                 m_balls_to_eject = m_balls_in_device
             End If
+            'Make sure the eject is picked up again even if the ball in flight never confirms
+            SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject", Me), Null), 600
             Exit Sub
         End If
         m_ejecting_all = True
@@ -259,6 +261,8 @@ Class GlfBallDevice
             'A ball is already on its way out. Everything still here follows it.
             m_ejecting_all = True
             m_balls_to_eject = m_balls_in_device
+            'Make sure the eject is picked up again even if the ball in flight never confirms
+            SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject", Me), Null), 600
             Exit Sub
         End If
         m_ejecting_all = True
