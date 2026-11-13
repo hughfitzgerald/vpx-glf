@@ -4276,7 +4276,13 @@ Class GlfBallHold
             DispatchPinEvent m_name & "_balls_released", kwargs
         End If
 
-        m_balls_held = m_balls_held - balls_released
+        'Count what is still queued instead of subtracting what was ejected. If a device
+        'had fewer balls than this hold thought, the difference is gone and must not stay counted.
+        Dim queued_device
+        m_balls_held = 0
+        For Each queued_device in m_hold_queue.Keys()
+            m_balls_held = m_balls_held + m_hold_queue(queued_device)
+        Next
         ReleaseBalls = balls_released
     End Function
 
