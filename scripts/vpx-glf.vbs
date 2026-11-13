@@ -8465,12 +8465,14 @@ Class GlfMultiballs
             Exit Function
         End If
 
-        balls_to_save = m_balls_live_target - balls
+        'This runs before the game lowers glf_BIP for the drain, so add the drained balls back
+        balls_to_save = m_balls_live_target - glf_BIP + balls
 
         Log "Balls to save: " & balls_to_save & ". Balls live target: " & m_balls_live_target & ". Balls in Play: " & glf_BIP & ". Balls Drained: " & balls
         
         If balls_to_save <= 0 Then
             BallDrainShootAgain = balls
+            Exit Function
         End If
 
         If balls_to_save > balls Then
@@ -8484,7 +8486,7 @@ Class GlfMultiballs
         DispatchPinEvent m_name & "_shoot_again", kwargs
         
         Log("Ball drained during MB. Requesting a new one")
-        m_queued_balls = m_queued_balls + 1
+        m_queued_balls = m_queued_balls + balls_to_save
         SetDelay m_name&"_queued_release", "MultiballsHandler" , Array(Array("queue_release", Me, m_queued_balls),Null), 1000
 
         BallDrainShootAgain = balls - balls_to_save
