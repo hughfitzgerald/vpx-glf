@@ -265,7 +265,7 @@ Class GlfBallDevice
         Log "Ball successfully exited"
         RemoveDelay m_name & "_eject_attempt"
         If m_ejecting_all = True Then
-            If m_balls_to_eject <= 0 Then
+            If m_balls_to_eject <= 0 Or (m_balls_in_device = 0 And BallsEntering() = 0) Then
                 m_ejecting_all = False
                 m_balls_to_eject = 0
                 Exit Sub
@@ -352,6 +352,21 @@ Class GlfBallDevice
         If balls <= 0 Then
             Exit Sub
         End If
+        If m_ejecting = True Then
+            'A ball is already on its way out. Add this request to the one in progress
+            'instead of replacing its count and kicking again.
+            If m_ejecting_all = False Then
+                m_balls_to_eject = 0
+            End If
+            m_ejecting_all = True
+            m_balls_to_eject = m_balls_to_eject + balls
+            If m_balls_to_eject > m_balls_in_device + BallsEntering() Then
+                m_balls_to_eject = m_balls_in_device + BallsEntering()
+            End If
+            'Make sure the eject is picked up again even if the ball in flight never confirms
+            SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject_retry", Me), Null), 600
+            Exit Sub
+        End If
         m_ejecting_all = True
         m_balls_to_eject = balls - 1
         Eject()
@@ -359,6 +374,14 @@ Class GlfBallDevice
 
     Public Sub EjectAll
         Log "Ejecting All." 
+        If m_ejecting = True Then
+            'A ball is already on its way out. Everything still here follows it.
+            m_ejecting_all = True
+            m_balls_to_eject = m_balls_in_device + BallsEntering()
+            'Make sure the eject is picked up again even if the ball in flight never confirms
+            SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject_retry", Me), Null), 600
+            Exit Sub
+        End If
         m_ejecting_all = True
         'Count a ball that has hit the switch but is still inside its entrance count delay
         m_balls_to_eject = m_balls_in_device + BallsEntering() - 1
