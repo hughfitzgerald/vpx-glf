@@ -1,0 +1,63 @@
+# Runs the GLF test bed without Visual Pinball (see tests/README.md).
+name: Test bed
+
+on:
+  push:
+    paths:
+      - "scripts/src/**"
+      - "tests/**"
+      - ".github/workflows/test-bed.yml"
+  pull_request:
+    paths:
+      - "scripts/src/**"
+      - "tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-bed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y bison cmake build-essential
+
+      - name: Cache libwinevbs
+        uses: actions/cache@v4
+        with:
+          path: tests/.work/libwinevbs
+          key: libwinevbs-${{ runner.os }}-${{ hashFiles('tests/run-tests.js') }}
+
+      - name: Install script dependencies
+        working-directory: scripts
+        run: npm ci
+
+      - name: Run the test bed
+        working-directory: scripts
+        run: npm run test:headless
+
+      - name: Keep the run output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-bed-output
+          path: |
+            tests/.work/vpx-output.log
+            tests/.work/glftest/script.vbs
+          if-no-files-found: ignore
