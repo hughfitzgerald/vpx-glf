@@ -387,8 +387,20 @@ Class GlfBallDevice
         If phase = 1 And HasBall() Then
             Exit Sub
         End If
+        If m_balls_in_device > 0 Then
+            If Glf_BallDeviceKeepsBalls(Replace(m_name, "balldevice_", "", 1, 1)) = True Then
+                'A held or locked ball is not the missing one. Kicking it out would only put the counts wrong.
+                Log "Ball Search skipped, device is holding or locking a ball"
+                Exit Sub
+            End If
+        End If
         If Not IsNull(m_eject_callback) Then
-            GetRef(m_eject_callback)(m_balls(0))
+            If Not IsNull(m_balls(0)) Then
+                'Use a normal eject so the device knows the ball is leaving
+                Eject()
+            Else
+                GetRef(m_eject_callback)(Null)
+            End If
         End If
     End Sub
 
@@ -432,6 +444,30 @@ Sub Glf_ClaimedBallMissing(device_name, balls)
         glf_debugLog.WriteToLog "Ball Device", "Locked ball left " & device_name & " without being ejected. BIP: " & glf_BIP
     End If
 End Sub
+
+'True if the named device belongs to a ball hold that is holding balls, or to a multiball lock.
+Function Glf_BallDeviceKeepsBalls(device_name)
+    Glf_BallDeviceKeepsBalls = False
+    Dim ball_hold, multiball_lock, device
+    For Each ball_hold in glf_ball_holds.Items()
+        If ball_hold.GetValue("balls_held") > 0 Then
+            For Each device in ball_hold.HoldDevices
+                If device = device_name Then
+                    Glf_BallDeviceKeepsBalls = True
+                    Exit Function
+                End If
+            Next
+        End If
+    Next
+    For Each multiball_lock in glf_multiball_locks.Items()
+        For Each device in multiball_lock.LockDevices
+            If device = device_name Then
+                Glf_BallDeviceKeepsBalls = True
+                Exit Function
+            End If
+        Next
+    Next
+End Function
 
 Function BallDeviceEventHandler(args)
     Dim ownProps, ball
