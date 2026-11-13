@@ -1,0 +1,15 @@
+{
+  "$type": "timer",
+  "center": {
+    "x": 100.0,
+    "y": 2100.0
+  },
+  "timer_enabled": true,
+  "timer_interval": -1,
+  "ui_locked": false,
+  "ui_visible": true,
+  "legacy_layer": 11,
+  "named_layer": "Timers",
+  "part_group": "Timers",
+  "desktop_backdrop": false
+}
