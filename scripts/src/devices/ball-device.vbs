@@ -24,6 +24,8 @@ Class GlfBallDevice
     Private m_entrance_count_delay
     Private m_incoming_balls
     Private m_lost_balls
+    Private m_claimed_balls
+    Private m_eject_requested
     Private m_exclude_from_ball_search
     Private m_auto_fire_on_unexpected_ball
     Private m_debug
@@ -112,6 +114,8 @@ Class GlfBallDevice
         m_balls_to_eject = 0
         m_balls_in_device = 0
         m_lost_balls = 0
+        m_claimed_balls = 0
+        m_eject_requested = False
         m_mechanical_eject = False
         m_eject_timeout = 1000
         m_eject_enable_time = 0
@@ -134,6 +138,10 @@ Class GlfBallDevice
 
     Public Sub BallEnter(ball, switch)
         RemoveDelay m_name & "_switch" & switch & "_eject_timeout"
+        If switch = 0 Then
+            'Any eject from this switch is over once a ball is back on it
+            m_eject_requested = False
+        End If
         Set m_balls(switch) = ball
         m_balls_in_device = m_balls_in_device + 1
         Log "Ball Entered"
@@ -152,6 +160,13 @@ Class GlfBallDevice
         End If
         If unclaimed_balls > 0 Then
             unclaimed_balls = DispatchRelayPinEvent(m_name & "_ball_enter", 1)
+            If unclaimed_balls < 1 Then
+                'A ball hold or multiball lock is keeping this ball
+                m_claimed_balls = m_claimed_balls + 1
+                If m_claimed_balls > m_balls_in_device Then
+                    m_claimed_balls = m_balls_in_device
+                End If
+            End If
         End If        
         Log "Unclaimed Balls: " & unclaimed_balls
         DispatchPinEvent m_name & "_ball_entered", Null
@@ -178,6 +193,17 @@ Class GlfBallDevice
 
     Public Sub BallExitSuccess(ball)
         m_ejecting = False
+        If m_eject_requested = False Then
+            'A ball left that GLF did not eject. If it was one a hold or lock was keeping, report it.
+            Dim claimed_lost : claimed_lost = LostClaimedBalls()
+            If claimed_lost > 0 Then
+                PostBallMissing claimed_lost, claimed_lost
+            End If
+        Else
+            'GLF ejected the ball, so nothing is missing. Just keep the claimed count in step.
+            LostClaimedBalls
+        End If
+        m_eject_requested = False
 
         If m_incoming_balls > 0 Then
             m_incoming_balls = m_incoming_balls - 1
@@ -208,6 +234,10 @@ Class GlfBallDevice
                 DispatchQueuePinEvent m_name & "_ball_eject_attempt", Null
                 SetDelay m_name & "_switch0_eject_timeout", "BallDeviceEventHandler", Array(Array("eject_timeout", Me), m_balls(0)), m_eject_timeout
                 m_ejecting = True
+                m_eject_requested = True
+                If m_claimed_balls > 0 Then
+                    m_claimed_balls = m_claimed_balls - 1
+                End If
             
                 GetRef(m_eject_callback)(m_balls(0))
                 If m_eject_enable_time > 0 Then
@@ -240,7 +270,34 @@ Class GlfBallDevice
     End Sub
 
     Public Sub ClearLostBalls()
+        'The balls that left without being ejected did not come back
+        Dim lost : lost = m_lost_balls
         m_lost_balls = 0
+        If lost > 0 Then
+            PostBallMissing lost, LostClaimedBalls()
+        End If
+    End Sub
+
+    'Number of balls a hold or lock was keeping that are no longer in the device
+    Private Function LostClaimedBalls()
+        LostClaimedBalls = 0
+        If m_claimed_balls > m_balls_in_device Then
+            LostClaimedBalls = m_claimed_balls - m_balls_in_device
+            m_claimed_balls = m_balls_in_device
+        End If
+    End Function
+
+    Private Sub PostBallMissing(balls, claimed_balls)
+        Log "Ball missing: " & balls & ", claimed: " & claimed_balls
+        Dim kwargs : Set kwargs = GlfKwargs()
+        With kwargs
+            .Add "balls", balls
+            .Add "claimed_balls", claimed_balls
+        End With
+        DispatchPinEvent m_name & "_ball_missing", kwargs
+        If claimed_balls > 0 Then
+            Glf_ClaimedBallMissing Replace(m_name, "balldevice_", "", 1, 1), claimed_balls
+        End If
     End Sub
 
     Public Sub BallSearch(phase)
@@ -274,6 +331,31 @@ Class GlfBallDevice
         End If
     End Sub
 End Class
+
+'A ball that a ball hold or multiball lock was keeping has left its device without being ejected.
+'Held balls are still counted in glf_BIP, so the hold only lowers its own count. Locked balls are
+'not counted in glf_BIP, so a locked ball that is back on the playfield is added to it.
+Sub Glf_ClaimedBallMissing(device_name, balls)
+    Dim ball_hold, multiball_lock, lock_device, is_lock_device
+    For Each ball_hold in glf_ball_holds.Items()
+        balls = balls - ball_hold.BallMissing(device_name)
+    Next
+    If balls <= 0 Then
+        Exit Sub
+    End If
+    is_lock_device = False
+    For Each multiball_lock in glf_multiball_locks.Items()
+        For Each lock_device in multiball_lock.LockDevices
+            If lock_device = device_name Then
+                is_lock_device = True
+            End If
+        Next
+    Next
+    If is_lock_device = True And glf_gameStarted = True And glf_gameTilted = False And glf_BIP > 0 Then
+        glf_BIP = glf_BIP + balls
+        glf_debugLog.WriteToLog "Ball Device", "Locked ball left " & device_name & " without being ejected. BIP: " & glf_BIP
+    End If
+End Sub
 
 Function BallDeviceEventHandler(args)
     Dim ownProps, ball

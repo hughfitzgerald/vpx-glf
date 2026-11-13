@@ -63,6 +63,7 @@ The ball device system generates several events that you can listen to:
 - `balldevice_{device_name}_ball_entered`: Triggered when a ball has successfully entered the device
 - `balldevice_{device_name}_ball_exiting`: Triggered when a ball is exiting the device
 - `balldevice_{device_name}_ball_eject_success`: Triggered when a ball has been successfully ejected from the device
+- `balldevice_{device_name}_ball_missing`: Triggered when a ball has left the device without being ejected and has not come back. `balls` is the number missing; `claimed_balls` is how many of them a ball hold or multiball lock was keeping
 
 Replace `{device_name}` with your actual ball device name.
 
