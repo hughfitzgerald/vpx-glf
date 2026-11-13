@@ -24,6 +24,7 @@ Class GlfBallDevice
     Private m_entrance_count_delay
     Private m_incoming_balls
     Private m_lost_balls
+    Private m_shifting_balls
     Private m_exclude_from_ball_search
     Private m_auto_fire_on_unexpected_ball
     Private m_debug
@@ -112,6 +113,7 @@ Class GlfBallDevice
         m_balls_to_eject = 0
         m_balls_in_device = 0
         m_lost_balls = 0
+        m_shifting_balls = 0
         m_mechanical_eject = False
         m_eject_timeout = 1000
         m_eject_enable_time = 0
@@ -133,6 +135,17 @@ Class GlfBallDevice
     End Sub
 
     Public Sub BallEnter(ball, switch)
+        If m_shifting_balls > 0 Then
+            'A ball that left a higher position has settled here. It never left the device,
+            'so it is not a new ball: no count change, no relay and no events.
+            m_shifting_balls = m_shifting_balls - 1
+            If m_shifting_balls = 0 Then
+                RemoveDelay m_name & "_shift_timeout"
+            End If
+            Set m_balls(switch) = ball
+            Log "Ball moved to switch " & switch
+            Exit Sub
+        End If
         RemoveDelay m_name & "_switch" & switch & "_eject_timeout"
         Set m_balls(switch) = ball
         m_balls_in_device = m_balls_in_device + 1
@@ -162,6 +175,15 @@ Class GlfBallDevice
 
     Public Sub BallExiting(ball, switch)
         RemoveDelay m_name & "_" & switch & "_ball_enter"
+        If switch > 0 Then
+            'Switch 0 is the exit. A ball leaving any other position is rolling down inside
+            'the device to take the place of one that left. Wait for it to settle.
+            m_balls(switch) = Null
+            m_shifting_balls = m_shifting_balls + 1
+            SetDelay m_name & "_shift_timeout", "BallDeviceEventHandler", Array(Array("shift_timeout", Me), Null), 3000
+            Log "Ball leaving switch " & switch & " to move down"
+            Exit Sub
+        End If
         If m_ejecting = False And m_mechanical_eject = False Then
             Log "Ball Lost, Wasn't Ejecting"
             m_lost_balls = m_lost_balls + 1
@@ -239,6 +261,16 @@ Class GlfBallDevice
         Eject()
     End Sub
 
+    'Balls that left a higher position never arrived at a lower one, so they are gone
+    Public Sub ShiftTimeout()
+        m_balls_in_device = m_balls_in_device - m_shifting_balls
+        If m_balls_in_device < 0 Then
+            m_balls_in_device = 0
+        End If
+        Log "Balls did not settle: " & m_shifting_balls
+        m_shifting_balls = 0
+    End Sub
+
     Public Sub ClearLostBalls()
         m_lost_balls = 0
     End Sub
@@ -306,6 +338,8 @@ Function BallDeviceEventHandler(args)
             ballDevice.BallExitSuccess ball
         Case "eject_enable_complete"
             ballDevice.EjectEnableComplete
+        Case "shift_timeout"
+            ballDevice.ShiftTimeout
         Case "clear_lost_balls"
             ballDevice.ClearLostBalls
     End Select
