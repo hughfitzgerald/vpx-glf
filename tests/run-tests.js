@@ -2,7 +2,8 @@
 // Builds glf.vbs from this checkout, assembles the test bed table, runs it in
 // Visual Pinball and reports each scenario as passed or failed.
 //
-//   node tests/run-tests.js                 run every scenario
+//   node tests/run-tests.js                 run every scenario in Visual Pinball
+//   node tests/run-tests.js --headless      run them without Visual Pinball (see below)
 //   node tests/run-tests.js --only a,b      run the named scenarios
 //   node tests/run-tests.js --isolate       restart Visual Pinball for each scenario
 //   node tests/run-tests.js --list          list scenario names
@@ -13,6 +14,12 @@
 //
 // Visual Pinball is found through the VPINBALL environment variable, or at the
 // default macOS location.
+//
+// --headless runs the same script in glftest_host, a small program built on
+// libwinevbs, the VBScript engine Visual Pinball standalone uses. Time is
+// simulated, so a run takes a second or two. The first run fetches and builds
+// libwinevbs, which needs git, cmake, bison and a C compiler. Set
+// LIBWINEVBS_DIR to use a checkout you already have.
 
 const fs = require('fs');
 const os = require('os');
@@ -29,13 +36,18 @@ const stageDir = path.join(workDir, 'glftest');
 const resultsFile = path.join(workDir, 'results.txt');
 const outputFile = path.join(workDir, 'vpx-output.log');
 
+const headlessDir = path.join(testsDir, 'headless');
+const hostBinary = path.join(workDir, process.platform === 'win32' ? 'glftest_host.exe' : 'glftest_host');
+const LIBWINEVBS_REPO = 'https://github.com/vpinball/libwinevbs';
+const LIBWINEVBS_COMMIT = 'aef82ffbd5fd248549007ed304fa670c187c28e9';
+
 const VPINBALL = process.env.VPINBALL
     || '/Applications/VPinballX_BGFX.app/Contents/MacOS/VPinballX_BGFX';
 
 // ---------- arguments ----------
 
 function parseArgs(argv) {
-    const args = { only: '', isolate: false, list: false, keepOpen: false, glf: '', timeout: 300, assemble: false };
+    const args = { only: '', isolate: false, list: false, keepOpen: false, glf: '', timeout: 300, assemble: false, headless: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--only') args.only = argv[++i] || '';
@@ -45,6 +57,7 @@ function parseArgs(argv) {
         else if (arg === '--glf') args.glf = argv[++i] || '';
         else if (arg === '--timeout') args.timeout = Number(argv[++i]) || 300;
         else if (arg === '--assemble') args.assemble = true;
+        else if (arg === '--headless') args.headless = true;
         else fail(`unknown option ${arg}`);
     }
     return args;
@@ -228,10 +241,76 @@ function runOnce(timeoutSeconds, keepOpen) {
     });
 }
 
+// ---------- headless ----------
+
+function runTool(command, commandArgs, cwd, what) {
+    const result = spawnSync(command, commandArgs, { cwd, encoding: 'utf8' });
+    if (result.error || result.status !== 0) {
+        console.error(result.stdout || '');
+        console.error(result.stderr || '');
+        fail(`${what} failed. The headless runner needs git, cmake, bison and a C compiler.`);
+    }
+}
+
+// Fetches and builds libwinevbs if needed, then builds glftest_host
+function ensureHost() {
+    fs.mkdirSync(workDir, { recursive: true });
+    const libDir = process.env.LIBWINEVBS_DIR ? path.resolve(process.env.LIBWINEVBS_DIR) : path.join(workDir, 'libwinevbs');
+    if (!fs.existsSync(path.join(libDir, 'CMakeLists.txt'))) {
+        console.log('Fetching libwinevbs (first run only)...');
+        runTool('git', ['clone', '--quiet', LIBWINEVBS_REPO, libDir], workDir, 'Fetching libwinevbs');
+        runTool('git', ['checkout', '--quiet', LIBWINEVBS_COMMIT], libDir, 'Selecting the libwinevbs version');
+    }
+    const library = path.join(libDir, 'build', 'libwinevbs.a');
+    if (!fs.existsSync(library)) {
+        console.log('Building libwinevbs (first run only)...');
+        const platform = process.platform === 'darwin' ? 'macos' : 'linux';
+        const arch = process.arch === 'arm64' ? (platform === 'macos' ? 'arm64' : 'aarch64') : 'x64';
+        runTool('cmake', ['-DCMAKE_BUILD_TYPE=Release', `-DPLATFORM=${platform}`, `-DARCH=${arch}`, '-DBUILD_SHARED=OFF', '-B', 'build'], libDir, 'Configuring libwinevbs');
+        runTool('cmake', ['--build', 'build', '--target', 'winevbs_static', '-j', '4'], libDir, 'Building libwinevbs');
+    }
+    const source = path.join(headlessDir, 'host.c');
+    const stale = !fs.existsSync(hostBinary) || fs.statSync(hostBinary).mtimeMs < fs.statSync(source).mtimeMs;
+    if (stale) {
+        runTool(process.env.CC || 'cc', [
+            '-O2', '-D__LIBWINEVBS__', '-D__WINESRC__', '-DWINE_UNICODE_NATIVE',
+            `-I${path.join(libDir, 'include')}`, `-I${path.join(libDir, 'wine', 'include')}`,
+            `-I${path.join(libDir, 'atl', 'include')}`, `-I${path.join(libDir, 'atlmfc', 'include')}`,
+            source, library, '-lm', '-o', hostBinary,
+        ], workDir, 'Building glftest_host');
+    }
+}
+
+// Runs the assembled script in glftest_host and resolves with the result lines
+function runHeadless(simulatedSeconds) {
+    return new Promise((resolve) => {
+        const child = spawn(hostBinary, [path.join(headlessDir, 'prelude.vbs'), path.join(stageDir, 'script.vbs'), String(simulatedSeconds), '10'], { cwd: workDir });
+        const lines = [];
+        let pending = '';
+        const take = (data) => {
+            fs.appendFileSync(outputFile, data);
+            pending += data.toString();
+            const parts = pending.split(/\r?\n/);
+            pending = parts.pop();
+            for (const line of parts) {
+                if (line.startsWith('TB|')) {
+                    lines.push(line);
+                    showLine(line);
+                }
+            }
+        };
+        child.stdout.on('data', take);
+        child.stderr.on('data', take);
+        child.on('error', (error) => resolve({ lines, reason: `could not start glftest_host: ${error.message}` }));
+        child.on('exit', () => resolve({ lines, reason: lines.some((l) => l.startsWith('TB|DONE')) ? 'done' : 'the script stopped before finishing' }));
+    });
+}
+
 function scriptErrors() {
     if (!fs.existsSync(outputFile)) return [];
     return fs.readFileSync(outputFile, 'utf8').split(/\r?\n/)
-        .filter((line) => /script error|runtime error|compile error|OnScriptError/i.test(line));
+        .filter((line, index, all) => /script error|runtime error|compile error|OnScriptError/i.test(line)
+            || (index > 0 && /^\s+> /.test(line) && /script error/i.test(all[index - 1])));
 }
 
 // ---------- main ----------
@@ -259,18 +338,22 @@ async function main() {
         console.log(`Table folder written to ${stageDir}`);
         return;
     }
-    if (!fs.existsSync(VPINBALL)) {
-        fail(`Visual Pinball not found at ${VPINBALL}. Set the VPINBALL environment variable.`);
+    if (args.headless) {
+        ensureHost();
+    } else if (!fs.existsSync(VPINBALL)) {
+        fail(`Visual Pinball not found at ${VPINBALL}. Set the VPINBALL environment variable, or use --headless.`);
     }
 
-    console.log(`GLF test bed: testing ${glf.label}`);
+    console.log(`GLF test bed: testing ${glf.label}${args.headless ? ' (headless)' : ''}`);
 
     const batches = args.isolate ? wanted.map((name) => [name]) : [wanted];
     const all = [];
     const problems = [];
     for (const batch of batches) {
         assemble(glf.text, args.only || args.isolate ? batch.join(',') : '', !args.keepOpen);
-        const { lines, reason } = await runOnce(args.timeout, args.keepOpen);
+        const { lines, reason } = args.headless
+            ? await runHeadless(args.timeout * 4)
+            : await runOnce(args.timeout, args.keepOpen);
         all.push(...lines);
         if (reason !== 'done') problems.push(`${batch.join(', ')}: ${reason}`);
     }
@@ -295,7 +378,7 @@ async function main() {
         errors.slice(0, 20).forEach((line) => console.log(`  ${line}`));
     }
     if (problems.length || notRun.length) {
-        console.log(`\nVisual Pinball's output is in ${outputFile}`);
+        console.log(`\nThe full output is in ${outputFile}`);
     }
 
     process.exit(failed.length || notRun.length || problems.length ? 1 : 0);
