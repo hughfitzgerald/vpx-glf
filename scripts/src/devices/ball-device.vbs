@@ -135,6 +135,13 @@ Class GlfBallDevice
 
     Public Sub BallEnter(ball, switch)
         RemoveDelay m_name & "_switch" & switch & "_eject_timeout"
+        If m_ejecting = True And switch = 0 Then
+            'A ball is back on the eject switch before the eject was confirmed, so that eject is over.
+            'Without this the device stays in its ejecting state and HasBall never returns True again.
+            m_ejecting = False
+            Log "Eject failed, ball returned"
+            DispatchPinEvent m_name & "_ball_eject_failed", Null
+        End If
         Set m_balls(switch) = ball
         m_balls_in_device = m_balls_in_device + 1
         Log "Ball Entered"
