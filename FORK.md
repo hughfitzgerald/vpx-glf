@@ -120,3 +120,7 @@ git cherry-pick <commit id>
 | `fix/multiball-shoot-again` | Shoot again returns early when nothing needs saving and queues the right number of balls |
 | `fix/ball-device-ball-missing` | Holds and `glf_BIP` are corrected when a held or locked ball leaves without being ejected |
 | `fix/ball-search-claimed-balls` | Ball search no longer kicks out held and locked balls |
+| `fix/ball-device-ball-shift` | A ball rolling down inside a multi-switch device is no longer handled as a new ball |
+| `fix/ball-hold-release-count` | A hold's count stays right when its device has already lost a ball |
+| `fix/ball-search-empty-categories` | Ball search finishes on tables with no auto-fire devices, drop targets or diverters |
+| `fix/ball-device-overlapping-ejects` | Eject requests that overlap are combined instead of the second replacing the first (builds on `fix/ball-device-failed-eject`) |
