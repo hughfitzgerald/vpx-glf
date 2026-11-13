@@ -217,6 +217,31 @@ Class GlfBallHold
         HoldBall = unclaimed_balls - balls_to_hold
     End Function
 
+    'Called when a ball this hold was keeping has left its device without being released.
+    'Returns the number of balls written off.
+    Public Function BallMissing(device)
+        BallMissing = 0
+        If Not m_hold_queue.Exists(device) Then
+            Exit Function
+        End If
+        Dim in_device : in_device = glf_ball_devices(device).Balls()
+        Dim lost : lost = m_hold_queue(device) - in_device
+        If lost <= 0 Then
+            Exit Function
+        End If
+        If in_device > 0 Then
+            m_hold_queue(device) = in_device
+        Else
+            m_hold_queue.Remove device
+        End If
+        m_balls_held = m_balls_held - lost
+        If m_balls_held < 0 Then
+            m_balls_held = 0
+        End If
+        Log "Lost " & lost & " held balls from " & device
+        BallMissing = lost
+    End Function
+
     Public Function ReleaseAll()
         'Release all balls in hold.
         ReleaseAll = ReleaseBalls(m_balls_held)
