@@ -13703,7 +13703,7 @@ Class GlfBallDevice
         m_eject_targets = value
         Dim evt
         For Each evt in m_eject_targets
-            AddPinEventListener evt & "_active", m_name & "_eject_target", "BallDeviceEventHandler", 1000, Array("eject_timeout", Me)
+            AddPinEventListener evt & "_active", m_name & "_eject_target", "BallDeviceEventHandler", 1000, Array("eject_target", Me)
         Next
     End Property
     Public Property Let PlayerControlledEjectEvent(value)
@@ -13829,6 +13829,20 @@ Class GlfBallDevice
         End If
     End Sub
 
+    Public Sub EjectTargetHit(ball)
+        'An eject target switch confirms an eject early. Ignore it unless a ball is on its way out,
+        'and cancel the pending timeout so the same eject is not confirmed twice.
+        Dim x, pending : pending = False
+        For x = 0 to UBound(m_ball_switches)
+            If RemoveDelay(m_name & "_switch" & x & "_eject_timeout") = True Then
+                pending = True
+            End If
+        Next
+        If m_ejecting = True Or pending = True Then
+            BallExitSuccess ball
+        End If
+    End Sub
+
     Public Sub Eject
         
         If Not IsNull(m_eject_callback) Then
@@ -13934,6 +13948,9 @@ Function BallDeviceEventHandler(args)
         Case "eject_timeout"
             Set ball = args(1)
             ballDevice.BallExitSuccess ball
+        Case "eject_target"
+            Set ball = args(1)
+            ballDevice.EjectTargetHit ball
         Case "eject_enable_complete"
             ballDevice.EjectEnableComplete
         Case "clear_lost_balls"
