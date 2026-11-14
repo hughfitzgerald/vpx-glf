@@ -153,6 +153,18 @@ Sub ConfigureGlfDevices()
         End With
     End With
 
+    'Tilts on the first warning. Post s_tilt_warning_active to tilt the ball in play.
+    With CreateGlfMode("tb_tilt", 10000)
+        .StartEvents = Array("ball_started")
+        .StopEvents = Array("ball_will_end")
+        With .Tilt()
+            .MultipleHitWindow = 0
+            .SettleTime = 300
+            .WarningsToTilt = 1
+            .ResetWarningEvents = Array("mode_tb_tilt_started")
+        End With
+    End With
+
     'Two-ball multiball fed from the lock, then the trough
     With CreateGlfMode("tb_mb", 400)
         .StartEvents = Array("tb_enable_mb")

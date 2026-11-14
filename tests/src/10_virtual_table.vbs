@@ -230,12 +230,33 @@ Sub TB_SwitchActive(switch_name, ball)
         DispatchPinEvent switch_name & "_active", ball
         glf_last_switch_hit_time = gametime
         glf_last_switch_hit = switch_name
+    Else
+        TB_TiltedSwitch switch_name, True, ball
     End If
 End Sub
 
 Sub TB_SwitchInactive(switch_name, ball)
     If Not glf_gameTilted Then
         DispatchPinEvent switch_name & "_inactive", ball
+    Else
+        TB_TiltedSwitch switch_name, False, ball
+    End If
+End Sub
+
+'While tilted GLF posts no switch events. Builds with fix/ball-device-tilt still tell
+'ball devices about their own switches through Glf_TiltedSwitch; older builds have no such sub.
+Sub TB_TiltedSwitch(switch_name, is_active, ball)
+    Dim handler, found
+    found = False
+    On Error Resume Next
+    Set handler = GetRef("Glf_TiltedSwitch")
+    If Err.Number = 0 Then
+        found = True
+    End If
+    Err.Clear
+    On Error Goto 0
+    If found = True Then
+        Call handler(switch_name, is_active, ball)
     End If
 End Sub
 
