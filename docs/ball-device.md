@@ -79,4 +79,8 @@ Replace `{device_name}` with your actual ball device name.
 - The entrance count delay helps prevent false ball detection
 - Mechanical ejection mode uses timeouts to track successful ball exits
 - Player controlled ejection allows manual triggering via events
-- Eject targets can be used to trigger ejection timeouts when specific targets are hit 
+- Eject targets can be used to trigger ejection timeouts when specific targets are hit
+
+## While the game is tilted
+
+GLF posts no switch events during a tilt, so nothing scores. Ball devices still follow their own ball switches. A ball that enters a device while the game is tilted is not offered to ball holds or multiball locks, and every device except the default device (the plunger lane) ejects it, so it can drain and the tilt can finish.
