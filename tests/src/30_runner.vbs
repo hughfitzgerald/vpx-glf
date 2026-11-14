@@ -32,6 +32,7 @@ Const TB_PRELUDE_STEPS = 4          'steps used by TB_OneBallInPlay
 
 Dim tb_scenarios : Set tb_scenarios = CreateObject("Scripting.Dictionary")   'name -> known issue text, or ""
 Dim tb_watched     : Set tb_watched     = CreateObject("Scripting.Dictionary")   'event name -> times seen
+Dim tb_watched_kwargs : Set tb_watched_kwargs = CreateObject("Scripting.Dictionary")   'event name -> arguments of the last one seen
 Dim tb_phase : tb_phase = "boot"
 Dim tb_index : tb_index = -1
 Dim tb_current : tb_current = ""
@@ -64,6 +65,15 @@ Sub TB_KnownIssueScenario(scenario_name, issue)
     tb_scenarios.Add scenario_name, issue
 End Sub
 
+'Fail the scenario straight away when the GLF build under test lacks a feature.
+'Features are the optional blocks in 21_config_features.vbs.
+Function TB_Require(feature)
+    TB_Require = tb_features.Exists(feature)
+    If Not TB_Require Then
+        TB_Fail "this GLF build has " & feature, "not in this build"
+    End If
+End Function
+
 Sub TB_StartGame()
     DispatchRelayPinEvent "request_to_start_game", True
 End Sub
@@ -79,8 +89,11 @@ Sub TB_WaitUntil(label, condition, timeout_ms)
     tb_cond_deadline = gametime + timeout_ms
 End Sub
 
-'Count how many times GLF posts an event. Read the count with TB_Seen.
+'Count how many times GLF posts an event. Read the count with TB_Seen and its arguments with TB_Kwarg.
 Sub TB_Watch(event_name)
+    If tb_watched_kwargs.Exists(event_name) Then
+        tb_watched_kwargs.Remove event_name
+    End If
     If tb_watched.Exists(event_name) Then
         tb_watched(event_name) = 0
     Else
@@ -97,9 +110,32 @@ Function TB_Seen(event_name)
     End If
 End Function
 
+'One argument of the last watched event of that name, or Empty if it had none.
+Function TB_Kwarg(event_name, key)
+    TB_Kwarg = Empty
+    If tb_watched_kwargs.Exists(event_name) Then
+        If tb_watched_kwargs(event_name).Exists(key) Then
+            TB_Kwarg = tb_watched_kwargs(event_name)(key)
+        End If
+    End If
+End Function
+
 Function TB_WatchHandler(args)
     Dim event_name : event_name = args(0)
     tb_watched(event_name) = tb_watched(event_name) + 1
+    If tb_watched_kwargs.Exists(event_name) Then
+        tb_watched_kwargs.Remove event_name
+    End If
+    If IsObject(args(1)) Then
+        If TypeName(args(1)) = "Dictionary" Then
+            'Copied, because GLF hands the same dictionary on to the next listener
+            Dim copy, key : Set copy = CreateObject("Scripting.Dictionary")
+            For Each key In args(1).Keys
+                copy.Add key, args(1)(key)
+            Next
+            tb_watched_kwargs.Add event_name, copy
+        End If
+    End If
     If IsObject(args(1)) Then
         Set TB_WatchHandler = args(1)
     Else

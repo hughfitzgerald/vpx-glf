@@ -178,4 +178,7 @@ Sub ConfigureGlfDevices()
         End With
     End With
 
+    'Features that only some GLF builds have. See 21_config_features.vbs.
+    TB_ConfigureFeatures
+
 End Sub
