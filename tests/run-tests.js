@@ -146,6 +146,7 @@ function assemble(glfText, only, quitWhenDone) {
         runConfig,
         read(path.join(srcDir, '10_virtual_table.vbs')),
         read(path.join(srcDir, '20_config.vbs')),
+        read(path.join(srcDir, '21_config_features.vbs')),
         read(path.join(srcDir, '30_runner.vbs')),
         ...scenarioFiles().map((f) => read(path.join(scenariosDir, f))),
         read(path.join(srcDir, '90_table.vbs')),
