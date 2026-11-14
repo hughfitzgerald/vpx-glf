@@ -124,3 +124,6 @@ git cherry-pick <commit id>
 | `fix/ball-hold-release-count` | A hold's count stays right when its device has already lost a ball |
 | `fix/ball-search-empty-categories` | Ball search finishes on tables with no auto-fire devices, drop targets or diverters |
 | `fix/ball-device-overlapping-ejects` | Eject requests that overlap are combined instead of the second replacing the first (builds on `fix/ball-device-failed-eject`) |
+| `fix/drain-after-ball-end` | A ball that drains after the last ball in play has drained no longer ends the ball twice |
+| `fix/ball-device-tilt` | Ball devices follow their own switches during a tilt and eject any ball that arrives |
+| `feat/ball-audit-extra-balls` | `glf_ball_audit_extra_balls` lets a table tell the ball audit about balls that did not come from the trough (builds on `feat/debug-ball-audit`) |

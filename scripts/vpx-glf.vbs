@@ -44,6 +44,7 @@ Dim glf_codestr : glf_codestr = ""
 Dim glf_codeFuncRefStr : glf_codeFuncRefStr = ""
 Dim glf_state_machines : Set glf_state_machines = CreateObject("Scripting.Dictionary")
 Dim glf_ball_devices : Set glf_ball_devices = CreateObject("Scripting.Dictionary")
+Dim glf_ball_device_switches : Set glf_ball_device_switches = CreateObject("Scripting.Dictionary")
 Dim glf_diverters : Set glf_diverters = CreateObject("Scripting.Dictionary")
 Dim glf_flippers : Set glf_flippers = CreateObject("Scripting.Dictionary")
 Dim glf_autofiredevices : Set glf_autofiredevices = CreateObject("Scripting.Dictionary")
@@ -190,8 +191,8 @@ Public Sub Glf_Init(ByRef table)
 
 	Dim switch
 	For Each switch In Glf_Switches
-		Glf_AddTablePart "Sub " & switch.Name & "_Hit() : If Not glf_gameTilted Then : DispatchPinEvent """ & switch.Name & "_active"", ActiveBall : glf_last_switch_hit_time = gametime : glf_last_switch_hit = """ & switch.Name & """: End If : End Sub"
-		Glf_AddTablePart "Sub " & switch.Name & "_UnHit() : If Not glf_gameTilted Then : DispatchPinEvent """ & switch.Name & "_inactive"", ActiveBall : End If : End Sub"
+		Glf_AddTablePart "Sub " & switch.Name & "_Hit() : If Not glf_gameTilted Then : DispatchPinEvent """ & switch.Name & "_active"", ActiveBall : glf_last_switch_hit_time = gametime : glf_last_switch_hit = """ & switch.Name & """: Else : Glf_TiltedSwitch """ & switch.Name & """, True, ActiveBall : End If : End Sub"
+		Glf_AddTablePart "Sub " & switch.Name & "_UnHit() : If Not glf_gameTilted Then : DispatchPinEvent """ & switch.Name & "_inactive"", ActiveBall : Else : Glf_TiltedSwitch """ & switch.Name & """, False, ActiveBall : End If : End Sub"
 	Next
 
 	Glf_AddTablePart ""
@@ -14279,6 +14280,11 @@ Class GlfBallDevice
         For x=0 to UBound(m_ball_switches)
             m_balls(x) = Null
             m_entering(x) = False
+            'Lets the device follow its own switches while the game is tilted (see Glf_TiltedSwitch)
+            If glf_ball_device_switches.Exists(m_ball_switches(x)) Then
+                glf_ball_device_switches.Remove m_ball_switches(x)
+            End If
+            glf_ball_device_switches.Add m_ball_switches(x), Array(Me, x)
             AddPinEventListener m_ball_switches(x)&"_active", m_name & "_ball_enter", "BallDeviceEventHandler", 1000, Array("ball_entering", Me, x)
             AddPinEventListener m_ball_switches(x)&"_inactive", m_name & "_ball_exiting", "BallDeviceEventHandler", 1000, Array("ball_exiting", Me, x)
         Next
@@ -14379,6 +14385,17 @@ Class GlfBallDevice
             Log "Lost Ball Found"
             If m_lost_balls = 0 Then
                 RemoveDelay m_name & "_clear_lost_balls"
+            End If
+            Exit Sub
+        End If
+
+        If glf_gameTilted = True Then
+            'Nothing may keep a ball while the game is tilted. Holds and locks are not offered
+            'the ball, and every device except the plunger lane sends it back so it can drain.
+            Log "Ball entered while tilted"
+            DispatchPinEvent m_name & "_ball_entered", Null
+            If m_default_device = False Then
+                SetDelay m_name & "_eject_attempt", "BallDeviceEventHandler", Array(Array("ball_eject", Me), ball), 500
             End If
             Exit Sub
         End If
@@ -14756,6 +14773,27 @@ Function BallDeviceEventHandler(args)
             ballDevice.ClearLostBalls
     End Select
 End Function
+
+'Called for every switch hit and release while the game is tilted. No switch events are
+'posted during a tilt, so nothing scores, but a ball device still has to know when a ball
+'reaches or leaves it: otherwise a ball that rolls into a device is never kicked out and
+'the tilt cannot finish, and a ball that leaves stays counted in the device.
+Sub Glf_TiltedSwitch(switch_name, is_active, ball)
+    If Not glf_ball_device_switches.Exists(switch_name) Then
+        Exit Sub
+    End If
+    Dim entry : entry = glf_ball_device_switches(switch_name)
+    If is_active = True Then
+        entry(0).BallEntering ball, entry(1)
+    Else
+        If RemoveDelay(entry(0).Name & "_" & entry(1) & "_ball_enter") = False Then
+            entry(0).BallExiting ball, entry(1)
+        Else
+            entry(0).BallEnterCancelled entry(1)
+        End If
+    End If
+End Sub
+
 Function CreateGlfDiverter(name)
 	Dim diverter : Set diverter = (new GlfDiverter)(name)
 	Set CreateGlfDiverter = diverter
