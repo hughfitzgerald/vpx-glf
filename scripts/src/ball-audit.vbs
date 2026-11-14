@@ -7,6 +7,7 @@
 '
 '   glf_BIP should equal  total balls - balls in the trough - ball in the drain
 '                         - balls sitting in multiball lock devices
+'                         + glf_ball_audit_extra_balls (set by the table, normally 0)
 '
 ' Balls in the plunger lane, on the playfield and in ball holds all count as in
 ' play. A mismatch is written to the debug log once the ball positions have been
@@ -16,6 +17,11 @@
 Dim glf_ball_audit_last : glf_ball_audit_last = ""
 Dim glf_ball_audit_reported : glf_ball_audit_reported = ""
 Dim glf_ball_audit_expected : glf_ball_audit_expected = 0
+
+' Balls in play that did not come from the trough, such as a captive ball the table has
+' set free. A table that puts such a ball into play and adds it to glf_BIP sets this to
+' the number of them, and back to 0 when they are out of play again.
+Dim glf_ball_audit_extra_balls : glf_ball_audit_extra_balls = 0
 
 AddPinEventListener "reset_complete", "glf_ball_audit_start", "Glf_BallAuditStart", 10, Null
 
@@ -103,10 +109,10 @@ Function Glf_BallAuditSnapshot()
 		End If
 	Next
 
-	glf_ball_audit_expected = glf_troughSize - trough_balls - drain_balls - locked_balls
+	glf_ball_audit_expected = glf_troughSize - trough_balls - drain_balls - locked_balls + glf_ball_audit_extra_balls
 	Glf_BallAuditSnapshot = "glf_BIP=" & glf_BIP & ", expected=" & glf_ball_audit_expected & _
 		" (total=" & glf_troughSize & ", trough=" & trough_balls & ", drain=" & drain_balls & _
-		", in lock devices=" & locked_balls & "). Held=" & held_balls & ". Devices:" & devices
+		", in lock devices=" & locked_balls & ", extra=" & glf_ball_audit_extra_balls & "). Held=" & held_balls & ". Devices:" & devices
 End Function
 
 'Number of balls over a named kicker, or 0 if the table has no such object.

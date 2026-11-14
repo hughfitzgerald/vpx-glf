@@ -42,6 +42,8 @@ With debug logging enabled, GLF checks every two seconds during a game that `glf
 
 A disagreement that persists for two checks is logged once under the label `Ball Audit` as `MISMATCH`, with the count from each ball device. `OK again` is logged when the counts agree again. The audit never changes game state. Source: `scripts/src/ball-audit.vbs`.
 
+If the table puts a ball into play that did not come from the trough, such as a captive ball it sets free, and adds it to `glf_BIP`, set `glf_ball_audit_extra_balls` to the number of such balls while they are in play and back to `0` afterwards. Without it the audit reports a mismatch for as long as that ball is in play.
+
 ## Verify cleanup and player boundaries
 
 After fixing the normal path, exercise timeout, mode cancellation, tilt, drain, next player and a new game. Look for timers still posting events, repeating shows or sounds, held balls, stale shot states and duplicate listeners. A successful first hit is not enough to establish a feature's lifecycle.
