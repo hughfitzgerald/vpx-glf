@@ -269,6 +269,13 @@ Function Glf_Drain(args)
             Exit Function
         End If
 
+        If glf_BIP <= 0 Then
+            'The last ball in play has already drained and the ball is ending.
+            'A ball that reaches the drain after that must not end the ball a second time.
+            glf_debugLog.WriteToLog "Trough", "Ball drained with no balls in play, ignored"
+            Exit Function
+        End If
+
         glf_BIP = glf_BIP - 1
         glf_debugLog.WriteToLog "Trough", "Ball Drained: BIP: " & glf_BIP
 
