@@ -127,14 +127,16 @@ Function TB_WatchHandler(args)
         tb_watched_kwargs.Remove event_name
     End If
     If IsObject(args(1)) Then
-        If TypeName(args(1)) = "Dictionary" Then
-            'Copied, because GLF hands the same dictionary on to the next listener
-            Dim copy, key : Set copy = CreateObject("Scripting.Dictionary")
-            For Each key In args(1).Keys
-                copy.Add key, args(1)(key)
-            Next
-            tb_watched_kwargs.Add event_name, copy
-        End If
+        'Copied, because GLF hands the same dictionary on to the next listener.
+        'Anything that is not a dictionary of plain values is skipped.
+        Dim copy, key : Set copy = CreateObject("Scripting.Dictionary")
+        On Error Resume Next
+        For Each key In args(1).Keys
+            copy.Add key, args(1)(key)
+        Next
+        Err.Clear
+        On Error Goto 0
+        tb_watched_kwargs.Add event_name, copy
     End If
     If IsObject(args(1)) Then
         Set TB_WatchHandler = args(1)
