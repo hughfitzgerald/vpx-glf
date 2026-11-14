@@ -10,6 +10,8 @@ Class Mode
     Private m_started
     Private m_ballsaves
     Private m_counters
+    Private m_accruals
+    Private m_sequences
     Private m_multiball_locks
     Private m_multiballs
     Private m_shots
@@ -106,6 +108,28 @@ Class Mode
             Dim new_ballsave : Set new_ballsave = (new BallSave)(name, Me)
             m_ballsaves.Add name, new_ballsave
             Set BallSaves = new_ballsave
+        End If
+    End Property
+
+    Public Property Get AccrualsItems() : AccrualsItems = m_accruals.Items() : End Property
+    Public Property Get Accruals(name)
+        If m_accruals.Exists(name) Then
+            Set Accruals = m_accruals(name)
+        Else
+            Dim new_accrual : Set new_accrual = (new GlfStepLogicBlock)(name, Me, "accrual")
+            m_accruals.Add name, new_accrual
+            Set Accruals = new_accrual
+        End If
+    End Property
+
+    Public Property Get SequencesItems() : SequencesItems = m_sequences.Items() : End Property
+    Public Property Get Sequences(name)
+        If m_sequences.Exists(name) Then
+            Set Sequences = m_sequences(name)
+        Else
+            Dim new_sequence : Set new_sequence = (new GlfStepLogicBlock)(name, Me, "sequence")
+            m_sequences.Add name, new_sequence
+            Set Sequences = new_sequence
         End If
     End Property
 
@@ -308,6 +332,12 @@ Class Mode
         For Each config_item in m_timers.Items()
             config_item.Debug = value
         Next
+        For Each config_item in m_accruals.Items()
+            config_item.Debug = value
+        Next
+        For Each config_item in m_sequences.Items()
+            config_item.Debug = value
+        Next
         For Each config_item in m_multiball_locks.Items()
             config_item.Debug = value
         Next
@@ -390,6 +420,8 @@ Class Mode
         Set m_stop_events = CreateObject("Scripting.Dictionary")
         Set m_ballsaves = CreateObject("Scripting.Dictionary")
         Set m_counters = CreateObject("Scripting.Dictionary")
+        Set m_accruals = CreateObject("Scripting.Dictionary")
+        Set m_sequences = CreateObject("Scripting.Dictionary")
         Set m_timers = CreateObject("Scripting.Dictionary")
         Set m_multiball_locks = CreateObject("Scripting.Dictionary")
         Set m_multiballs = CreateObject("Scripting.Dictionary")
@@ -508,6 +540,14 @@ Class Mode
             yaml = yaml & "  use_wait_queue: true" & vbCrLf
         End If
         
+        If UBound(m_accruals.Keys)>-1 Then
+            yaml = yaml & vbCrLf
+            yaml = yaml & "accruals: " & vbCrLf
+            For Each child in m_accruals.Keys
+                yaml = yaml & m_accruals(child).ToYaml
+            Next
+        End If
+
         If UBound(m_ballholds.Keys)>-1 Then
             yaml = yaml & vbCrLf
             yaml = yaml & "ball_holds: " & vbCrLf
@@ -605,6 +645,14 @@ Class Mode
                 yaml = yaml & "segment_display_player: " & vbCrLf
                 yaml = yaml & m_segment_display_player.ToYaml()
             End If
+        End If
+
+        If UBound(m_sequences.Keys)>-1 Then
+            yaml = yaml & vbCrLf
+            yaml = yaml & "sequences: " & vbCrLf
+            For Each child in m_sequences.Keys
+                yaml = yaml & m_sequences(child).ToYaml
+            Next
         End If
 
         If UBound(m_sequence_shots.Keys)>-1 Then
