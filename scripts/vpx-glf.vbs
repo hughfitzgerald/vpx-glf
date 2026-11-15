@@ -44,7 +44,6 @@ Dim glf_codestr : glf_codestr = ""
 Dim glf_codeFuncRefStr : glf_codeFuncRefStr = ""
 Dim glf_state_machines : Set glf_state_machines = CreateObject("Scripting.Dictionary")
 Dim glf_ball_devices : Set glf_ball_devices = CreateObject("Scripting.Dictionary")
-Dim glf_ball_device_switches : Set glf_ball_device_switches = CreateObject("Scripting.Dictionary")
 Dim glf_diverters : Set glf_diverters = CreateObject("Scripting.Dictionary")
 Dim glf_flippers : Set glf_flippers = CreateObject("Scripting.Dictionary")
 Dim glf_autofiredevices : Set glf_autofiredevices = CreateObject("Scripting.Dictionary")
@@ -16972,6 +16971,17 @@ Class GlfBallDevice
             m_incoming_balls = m_incoming_balls - 1
             unclaimed = 0
         End If
+        If glf_gameTilted = True Then
+            ' Nothing may keep a ball while the game is tilted. Holds and locks
+            ' are not offered the ball, and every device except the plunger lane
+            ' sends it back so it can drain and the tilt can finish.
+            Log "Received ball " & key & " while tilted"
+            DispatchPinEvent m_name & "_ball_entered", Null
+            If Not ReservePendingRequest(key) Then
+                If Not m_default_device Then Enqueue "", 500
+            End If
+            Exit Sub
+        End If
         ' Preserve GLF's numeric relay contract and expected-arrival behaviour.
         If unclaimed > 0 Then unclaimed = DispatchRelayPinEvent(m_name & "_ball_enter", 1)
         Log "Received ball " & key & ", unclaimed=" & unclaimed
@@ -17485,6 +17495,23 @@ Class GlfBallDevice
         If m_debug Then glf_debugLog.WriteToLog m_name, message
     End Sub
 End Class
+
+' Called for every switch hit and release while the game is tilted. No switch
+' events are posted during a tilt, so nothing scores, but ball devices listen
+' on the raw channel and still have to see every edge: otherwise a ball that
+' rolls into a device is never kicked out and the tilt cannot finish, and a
+' ball that leaves stays counted in the device.
+Sub Glf_TiltedSwitch(switch_name, is_active, ball)
+    Dim raw_event
+    If is_active = True Then
+        raw_event = switch_name & "_active__raw"
+    Else
+        raw_event = switch_name & "_inactive__raw"
+    End If
+    If glf_pinEvents.Exists(raw_event) Then
+        If glf_pinEvents(raw_event).Count > 0 Then AddToDispatchEvents raw_event, ball, 1
+    End If
+End Sub
 
 Function BallDeviceEventHandler(args)
     Dim ownProps, evt, device, kwargs

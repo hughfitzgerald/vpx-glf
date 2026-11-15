@@ -44,7 +44,6 @@ Dim glf_codestr : glf_codestr = ""
 Dim glf_codeFuncRefStr : glf_codeFuncRefStr = ""
 Dim glf_state_machines : Set glf_state_machines = CreateObject("Scripting.Dictionary")
 Dim glf_ball_devices : Set glf_ball_devices = CreateObject("Scripting.Dictionary")
-Dim glf_ball_device_switches : Set glf_ball_device_switches = CreateObject("Scripting.Dictionary")
 Dim glf_diverters : Set glf_diverters = CreateObject("Scripting.Dictionary")
 Dim glf_flippers : Set glf_flippers = CreateObject("Scripting.Dictionary")
 Dim glf_autofiredevices : Set glf_autofiredevices = CreateObject("Scripting.Dictionary")
