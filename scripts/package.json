@@ -6,7 +6,9 @@
   "scripts": {
     "test": "node ../tests/run-tests.js",
     "test:headless": "node ../tests/run-tests.js --headless",
-    "script-watcher": "grunt watch:vpx"
+    "test:unit": "node ../tests/run-tests.js --unit",
+    "script-watcher": "grunt watch:vpx",
+    "test:ball-device": "cscript //nologo tests\\ball-device-tests.vbs"
   },
   "author": "",
   "license": "ISC",
