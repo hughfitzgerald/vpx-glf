@@ -51,6 +51,7 @@ nav:
           - 'Segment Display': segment-display.md
     - Modes:
           - 'Accruals and Sequences': accrual-sequence.md
+          - 'Attract': attract.md
           - 'Ball Hold': ball-hold.md
           - 'Ball Save': ball-save.md
           - 'Bonus': bonus.md
