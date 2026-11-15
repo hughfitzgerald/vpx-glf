@@ -11,6 +11,7 @@ Sub TB_ConfigureFeatures()
     TB_Feature "logic_blocks", "TB_ConfigLogicBlocks"
     TB_Feature "bonus", "TB_ConfigBonus"
     TB_Feature "game_players", "TB_ConfigGamePlayers"
+    TB_Feature "credits", "TB_ConfigCredits"
 End Sub
 
 Sub TB_Feature(feature, config_sub)
@@ -87,3 +88,25 @@ End Sub
 Function TB_Refuse(args)
     TB_Refuse = False
 End Function
+
+'Coin play. Starts on free play so other scenarios can start games; the credits
+'scenario switches to credit play, and the runner switches back after every scenario.
+'A game costs 0.50 and 2.00 buys five, so a credit is two units of 0.25.
+Sub TB_ConfigCredits()
+    With EnableGlfCredits()
+        .MaxCredits = 4
+        .PersistCredits = False
+        .ServiceCreditsSwitch = "s_tb_service"
+        With .Switches("s_tb_coin_quarter")
+            .Value = 0.25
+        End With
+        With .Switches("s_tb_coin_dollar")
+            .Value = 1
+        End With
+        .AddPricingTier 0.5, 1
+        .AddPricingTier 2, 5
+        With .Events("tb_award_credit")
+            .Credits = 1
+        End With
+    End With
+End Sub
