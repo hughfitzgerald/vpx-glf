@@ -9,6 +9,7 @@ Dim tb_features : Set tb_features = CreateObject("Scripting.Dictionary")   'feat
 
 Sub TB_ConfigureFeatures()
     TB_Feature "logic_blocks", "TB_ConfigLogicBlocks"
+    TB_Feature "bonus", "TB_ConfigBonus"
 End Sub
 
 Sub TB_Feature(feature, config_sub)
@@ -49,6 +50,29 @@ Sub TB_ConfigLogicBlocks()
             .Events = Array("tb_gated_1", "tb_gated_2")
             .EnableEvents = Array("tb_gated_enable")
             .EventsWhenComplete = Array("tb_gated_done")
+        End With
+    End With
+End Sub
+
+'End-of-ball bonus. It runs at the end of every ball in every scenario, so the delays are short.
+'With no hits to count it only posts the total.
+Sub TB_ConfigBonus()
+    With EnableGlfBonus()
+        .DisplayDelayMs = 400
+        .HurryUpDelayMs = 20
+        .HurryUpEvent = "tb_bonus_hurry"
+        With .Entries("ramps")
+            .Score = 1000
+            .PlayerScoreEntry = "tb_ramps"
+            .ResetPlayerScoreEntry = True
+        End With
+        With .Entries("loops")
+            .Score = 250
+            .PlayerScoreEntry = "tb_loops"
+        End With
+        With .Entries("never")
+            .Score = 100
+            .PlayerScoreEntry = "tb_never_set"
         End With
     End With
 End Sub
