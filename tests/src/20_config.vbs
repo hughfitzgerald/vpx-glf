@@ -30,6 +30,7 @@ Sub ConfigureGlfDevices()
     With CreateGlfBallDevice("plunger")
         .BallSwitches = Array("s_tb_plunger")
         .EjectTimeout = TB_EJECT_TIMEOUT
+        .EntranceCountDelay = TB_ENTRANCE_COUNT_DELAY
         .MechanicalEject = True
         .DefaultDevice = True
         .EjectCallback = "TB_Eject_plunger"
