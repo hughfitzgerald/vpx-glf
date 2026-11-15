@@ -49,6 +49,7 @@ nav:
           - 'Standup Target': standup-target.md
           - 'Segment Display': segment-display.md
     - Modes:
+          - 'Attract': attract.md
           - 'Ball Hold': ball-hold.md
           - 'Ball Save': ball-save.md
           - 'Carousel': carousel.md
