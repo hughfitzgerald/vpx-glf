@@ -53,6 +53,7 @@ nav:
           - 'Ball Save': ball-save.md
           - 'Combo Switches': combo-switches.md
           - 'Counter': counter.md
+          - 'Credits': credits.md
           - 'DOF Player': dof-player.md
           - 'Event Player': event-player.md
           - 'Extra Ball': extra-ball.md
