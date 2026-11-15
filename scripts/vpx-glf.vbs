@@ -20024,6 +20024,10 @@ Function DispatchPinHandlers(e, args)
         If IsObject(retArgs) Then
             If retArgs.Exists("wait_for") Then
                 DispatchPinHandlers = retArgs("wait_for")
+                ' The wait belongs to this handler only. Left in the arguments it is passed
+                ' on to the remaining handlers, and the first of them would start the same
+                ' wait again, for an event that has already been posted.
+                retArgs.Remove "wait_for"
             End If
         End If
     Else
