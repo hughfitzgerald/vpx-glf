@@ -41,7 +41,7 @@ Before a player is added GLF posts the **player_add_request** relay. A listener 
 | `player_turn_starting` | Queue event, before the turn starts | `number` |
 | `player_turn_started` | The turn has started | `number` |
 | `ball_will_start` | A new ball is about to be served | `ball`, `player`, `balls_remaining` |
-| `ball_starting` | Queue event, before the ball is served | `ball`, `player`, `balls_remaining` |
+| `ball_starting` | Queue event. The ball is served once every listener is done, so a mode that starts on it with `UseWaitQueue` holds the ball back | `ball`, `player`, `balls_remaining` |
 | `ball_started` | The ball has been served | |
 | `single_player_ball_started` | With `ball_started`, in a one player game | |
 | `multi_player_ball_started` | With `ball_started`, in a game with more players | |
