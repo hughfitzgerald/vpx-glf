@@ -28,6 +28,9 @@ Function Scenario_ball_starting_holds(stage)
             TB_Post "tb_intro_done"
             TB_WaitUntil "ball is served once the mode stops", "TB_Dev(""plunger"").Count() = 1", 4000
         Case 3
+            'Let GLF count the ball into the plunger lane
+            Scenario_ball_starting_holds = 800
+        Case 4
             SetPlayerState "tb_intro", 0
             TB_Eq "player is on ball 2", GetPlayerState(GLF_CURRENT_BALL), 2
             TB_CheckCounts "ball 2", 1
