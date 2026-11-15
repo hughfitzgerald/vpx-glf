@@ -14509,6 +14509,9 @@ Class GlfBallDevice
         If IsNull(m_eject_callback) Then Exit Sub
         If SettleWait() > 0 Then Exit Sub
         If m_present.Count > 0 Then
+            ' A held or locked ball is not the missing one. Kicking it out
+            ' would only put the counts wrong.
+            If Glf_BallDeviceKeepsBalls(Replace(m_name, "balldevice_", "", 1, 1)) Then Exit Sub
             If phase > 1 Then Eject
         Else
             FireCallback Null
