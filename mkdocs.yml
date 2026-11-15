@@ -45,6 +45,7 @@ nav:
           - 'Diverter': diverter.md
           - 'Drop Target': drop-target.md
           - 'Flipper': flipper.md
+          - 'Kickback': kickback.md
           - 'Magnet': magnet.md
           - 'Standup Target': standup-target.md
           - 'Segment Display': segment-display.md
