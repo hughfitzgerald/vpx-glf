@@ -127,3 +127,12 @@ git cherry-pick <commit id>
 | `fix/drain-after-ball-end` | A ball that drains after the last ball in play has drained no longer ends the ball twice |
 | `fix/ball-device-tilt` | Ball devices follow their own switches during a tilt and eject any ball that arrives |
 | `feat/ball-audit-extra-balls` | `glf_ball_audit_extra_balls` lets a table tell the ball audit about balls that did not come from the trough (builds on `feat/debug-ball-audit`) |
+| `fix/queue-event-wait` | One handler's wait in a queue event is no longer passed on to the handlers after it |
+| `feat/logic-blocks` | Accruals and sequences (`.Accruals(name)`, `.Sequences(name)` on a mode) |
+| `feat/bonus-mode` | `EnableGlfBonus()`: the end-of-ball bonus mode |
+| `feat/game-players` | `MaxPlayers`, the `player_add_request` relay, player turn events, `ball_starting` as a queue event that holds the ball; player and trough code de-duplicated |
+| `feat/credits` | `EnableGlfCredits()`: coin play (builds on `feat/game-players`) |
+| `feat/kickbacks` | `CreateGlfKickback(name)` |
+| `feat/carousel` | `.Carousel()` on a mode |
+| `feat/attract` | `EnableGlfAttract()` (builds on `feat/carousel`) |
+| `feat/match` | `EnableGlfMatch()`: the end-of-game match |

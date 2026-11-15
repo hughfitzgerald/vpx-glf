@@ -5140,6 +5140,330 @@ Function BonusEventHandler(args)
     End If
 End Function
 
+' Carousel: a mode that lets the player step through a list of items and select one.
+' After MPF's carousel mode. Used for mode select screens, attract screens and menus.
+'
+' Any mode becomes a carousel by configuring its .Carousel(). While the mode runs,
+' one item is highlighted. Events move the highlight forwards and backwards, and an
+' event selects the highlighted item. What an item means is up to the table: start a
+' mode on carousel_item_selected, show a slide on carousel_item_highlighted.
+
+Class GlfCarousel
+
+    Private m_name
+    Private m_carousel_name
+    Private m_priority
+    Private m_base_device
+    Private m_debug
+
+    Private m_all_items
+    Private m_select_item_events
+    Private m_next_item_events
+    Private m_previous_item_events
+    Private m_block_events
+    Private m_release_events
+    Private m_wrap_items
+
+    Private m_items
+    Private m_highlighted_item_index
+    Private m_done
+    Private m_is_blocking
+    Private m_running
+
+    Public Property Get Name() : Name = m_name : End Property
+    Public Property Get Mode() : Set Mode = m_base_device.Mode : End Property
+
+    ' The name of the highlighted item, or "" when the carousel is not running
+    Public Property Get HighlightedItem()
+        HighlightedItem = ""
+        If m_running Then
+            HighlightedItem = m_items(m_highlighted_item_index)
+        End If
+    End Property
+
+    Public Property Get GetValue(value)
+        Select Case value
+            Case "highlighted_item"
+                GetValue = HighlightedItem
+            Case "done"
+                GetValue = m_done
+        End Select
+    End Property
+
+    ' Item names. An item may carry a condition, "bonus_round{current_player.level>2}",
+    ' and is then only offered when the condition is true as the mode starts.
+    Public Property Let SelectableItems(value)
+        Dim x
+        m_all_items = Array()
+        For x = 0 To UBound(value)
+            ReDim Preserve m_all_items(x)
+            Set m_all_items(x) = (new GlfEvent)(value(x))
+        Next
+    End Property
+    Public Property Let SelectItemEvents(value) : AddGlfEvents m_select_item_events, value : End Property
+    Public Property Let NextItemEvents(value) : AddGlfEvents m_next_item_events, value : End Property
+    Public Property Let PreviousItemEvents(value) : AddGlfEvents m_previous_item_events, value : End Property
+    Public Property Let BlockEvents(value) : AddGlfEvents m_block_events, value : End Property
+    Public Property Let ReleaseEvents(value) : AddGlfEvents m_release_events, value : End Property
+    Public Property Let WrapItems(value) : m_wrap_items = value : End Property
+
+    Public Property Let Debug(value)
+        m_debug = value
+        m_base_device.Debug = value
+    End Property
+    Public Property Get IsDebug()
+        If m_debug Then : IsDebug = 1 : Else : IsDebug = 0 : End If
+    End Property
+
+	Public default Function init(mode)
+        m_carousel_name = mode.ModeName
+        m_name = "carousel_" & mode.ModeName
+        m_priority = mode.Priority
+        m_debug = False
+        m_all_items = Array()
+        Set m_select_item_events = CreateObject("Scripting.Dictionary")
+        Set m_next_item_events = CreateObject("Scripting.Dictionary")
+        Set m_previous_item_events = CreateObject("Scripting.Dictionary")
+        Set m_block_events = CreateObject("Scripting.Dictionary")
+        Set m_release_events = CreateObject("Scripting.Dictionary")
+        m_wrap_items = True
+        m_items = Array()
+        m_highlighted_item_index = 0
+        m_done = False
+        m_is_blocking = False
+        m_running = False
+        Set m_base_device = (new GlfBaseModeDevice)(mode, "carousel", Me)
+        Set Init = Me
+	End Function
+
+    Private Sub AddGlfEvents(dict, value)
+        Dim x
+        For x=0 to UBound(value)
+            Dim newEvent : Set newEvent = (new GlfEvent)(value(x))
+            If Not dict.Exists(newEvent.Raw) Then
+                dict.Add newEvent.Raw, newEvent
+            End If
+        Next
+    End Sub
+
+    Private Sub AddHandlers(dict, action, priority_bump)
+        Dim evt
+        For Each evt in dict.Keys
+            AddPinEventListener dict(evt).EventName, m_name & "_" & evt & "_" & action, "CarouselEventHandler", m_priority+dict(evt).Priority+priority_bump, Array(action, Me, dict(evt))
+        Next
+    End Sub
+
+    Private Sub RemoveHandlers(dict, action)
+        Dim evt
+        For Each evt in dict.Keys
+            RemovePinEventListener dict(evt).EventName, m_name & "_" & evt & "_" & action
+        Next
+    End Sub
+
+    ' Called by the base mode device when the mode starts
+    Public Sub Activate()
+        Dim x
+        m_running = False
+        m_items = Array()
+        For x = 0 To UBound(m_all_items)
+            If m_all_items(x).Evaluate() Then
+                ReDim Preserve m_items(UBound(m_items) + 1)
+                m_items(UBound(m_items)) = m_all_items(x).EventName
+            End If
+        Next
+        If UBound(m_all_items) = -1 Then
+            ' Nothing to choose from: the mode runs as a plain mode
+            Exit Sub
+        End If
+        If UBound(m_items) = -1 Then
+            Log "Every item's condition is false. Stopping."
+            Dim kwargs : Set kwargs = GlfKwargs()
+            kwargs.Add "carousel", m_carousel_name
+            Glf_BcpSendEvent "carousel_items_empty", kwargs
+            DispatchPinEvent "carousel_items_empty", kwargs
+            m_base_device.Mode.StopMode
+            Exit Sub
+        End If
+
+        m_running = True
+        m_done = False
+        m_is_blocking = False
+        AddHandlers m_next_item_events, "next", 0
+        AddHandlers m_previous_item_events, "previous", 0
+        AddHandlers m_select_item_events, "select", 0
+        AddHandlers m_block_events, "block", 100
+        AddHandlers m_release_events, "release", 100
+        m_highlighted_item_index = 0
+        UpdateHighlightedItem Null
+    End Sub
+
+    ' Called by the base mode device when the mode stops
+    Public Sub Deactivate()
+        RemoveHandlers m_next_item_events, "next"
+        RemoveHandlers m_previous_item_events, "previous"
+        RemoveHandlers m_select_item_events, "select"
+        RemoveHandlers m_block_events, "block"
+        RemoveHandlers m_release_events, "release"
+        m_running = False
+    End Sub
+
+    Public Sub Enable()
+    End Sub
+
+    Public Sub Disable()
+    End Sub
+
+    Private Sub UpdateHighlightedItem(direction)
+        Dim item : item = m_items(m_highlighted_item_index)
+        Log "Highlighted item: " & item
+        Dim kwargs : Set kwargs = GlfKwargs()
+        kwargs.Add "carousel", m_carousel_name
+        kwargs.Add "direction", direction
+        kwargs.Add "item", item
+        Glf_BcpSendEvent "carousel_item_highlighted", kwargs
+        DispatchPinEvent "carousel_item_highlighted", kwargs
+        ' The same thing with the names in the event, which is easier to hang a player on
+        DispatchPinEvent m_carousel_name & "_" & item & "_highlighted", kwargs
+    End Sub
+
+    Public Sub NextItem()
+        If Not m_running Or m_done Or m_is_blocking Then
+            Exit Sub
+        End If
+        m_highlighted_item_index = m_highlighted_item_index + 1
+        If m_highlighted_item_index > UBound(m_items) Then
+            If Not m_wrap_items Then
+                m_highlighted_item_index = m_highlighted_item_index - 1
+                Exit Sub
+            End If
+            m_highlighted_item_index = 0
+        End If
+        UpdateHighlightedItem "forwards"
+    End Sub
+
+    Public Sub PreviousItem()
+        If Not m_running Or m_done Or m_is_blocking Then
+            Exit Sub
+        End If
+        m_highlighted_item_index = m_highlighted_item_index - 1
+        If m_highlighted_item_index < 0 Then
+            If Not m_wrap_items Then
+                m_highlighted_item_index = 0
+                Exit Sub
+            End If
+            m_highlighted_item_index = UBound(m_items)
+        End If
+        UpdateHighlightedItem "backwards"
+    End Sub
+
+    Public Sub SelectItem()
+        If Not m_running Or m_done Then
+            Exit Sub
+        End If
+        Dim item : item = m_items(m_highlighted_item_index)
+        Log "Selected item: " & item
+        m_done = True
+        Dim kwargs : Set kwargs = GlfKwargs()
+        kwargs.Add "carousel", m_carousel_name
+        kwargs.Add "item", item
+        Glf_BcpSendEvent "carousel_item_selected", kwargs
+        DispatchPinEvent "carousel_item_selected", kwargs
+        DispatchPinEvent m_carousel_name & "_" & item & "_selected", kwargs
+    End Sub
+
+    ' While blocked the highlight does not move. Selecting still works.
+    Public Sub Block()
+        m_is_blocking = True
+    End Sub
+
+    Public Sub Release()
+        m_is_blocking = False
+    End Sub
+
+    Private Sub Log(message)
+        If m_debug = True Then
+            glf_debugLog.WriteToLog m_name, message
+        End If
+    End Sub
+
+    Private Function EventsYaml(dict)
+        Dim yaml, key, y : y = 0
+        For Each key in dict.Keys
+            yaml = yaml & Replace(Replace(key, "&&", "and"), "||", "or")
+            If y <> UBound(dict.Keys) Then
+                yaml = yaml & ", "
+            End If
+            y = y + 1
+        Next
+        EventsYaml = yaml
+    End Function
+
+    ' Lines for the mode_settings section of the exported mode
+    Public Function ModeSettingsYaml()
+        Dim yaml, x
+        yaml = ""
+        If UBound(m_all_items) > -1 Then
+            yaml = yaml & "  selectable_items: "
+            For x = 0 To UBound(m_all_items)
+                yaml = yaml & Replace(Replace(m_all_items(x).Raw, "&&", "and"), "||", "or")
+                If x <> UBound(m_all_items) Then
+                    yaml = yaml & ", "
+                End If
+            Next
+            yaml = yaml & vbCrLf
+        End If
+        If UBound(m_select_item_events.Keys) > -1 Then
+            yaml = yaml & "  select_item_events: " & EventsYaml(m_select_item_events) & vbCrLf
+        End If
+        If UBound(m_next_item_events.Keys) > -1 Then
+            yaml = yaml & "  next_item_events: " & EventsYaml(m_next_item_events) & vbCrLf
+        End If
+        If UBound(m_previous_item_events.Keys) > -1 Then
+            yaml = yaml & "  previous_item_events: " & EventsYaml(m_previous_item_events) & vbCrLf
+        End If
+        If UBound(m_block_events.Keys) > -1 Then
+            yaml = yaml & "  block_events: " & EventsYaml(m_block_events) & vbCrLf
+        End If
+        If UBound(m_release_events.Keys) > -1 Then
+            yaml = yaml & "  release_events: " & EventsYaml(m_release_events) & vbCrLf
+        End If
+        If m_wrap_items = False Then
+            yaml = yaml & "  wrap_items: false" & vbCrLf
+        End If
+        ModeSettingsYaml = yaml
+    End Function
+End Class
+
+Function CarouselEventHandler(args)
+    Dim ownProps, kwargs : ownProps = args(0)
+    If IsObject(args(1)) Then
+        Set kwargs = args(1)
+    Else
+        kwargs = args(1)
+    End If
+    Dim evt : evt = ownProps(0)
+    Dim carousel : Set carousel = ownProps(1)
+    If ownProps(2).Evaluate() Then
+        Select Case evt
+            Case "next"
+                carousel.NextItem
+            Case "previous"
+                carousel.PreviousItem
+            Case "select"
+                carousel.SelectItem
+            Case "block"
+                carousel.Block
+            Case "release"
+                carousel.Release
+        End Select
+    End If
+    If IsObject(args(1)) Then
+        Set CarouselEventHandler = kwargs
+    Else
+        CarouselEventHandler = kwargs
+    End If
+End Function
+
 
 
 Class GlfComboSwitches
@@ -5957,6 +6281,47 @@ Function CounterEventHandler(args)
         CounterEventHandler = kwargs
     End If
 End Function
+
+Class GlfCounterControlEvent
+	Private m_event, m_action, m_value
+
+	Public Property Get EventName(): Set EventName = m_event: End Property
+    Public Property Let EventName(input)
+        Set m_event = (new GlfEvent)(input)
+    End Property
+
+    Public Property Get Action(): Action = m_action : End Property
+    Public Property Let Action(input): m_action = input : End Property
+
+    Public Property Get Value()
+        If Not IsNull(m_value) Then
+            Value = m_value.Value
+        Else
+            Value = 0
+        End If
+    End Property
+    Public Property Let Value(input)
+        Set m_value = CreateGlfInput(input)
+    End Property
+
+	Public default Function init()
+        m_event = Null
+        m_action = Empty
+        m_value = Null
+	    Set Init = Me
+	End Function
+
+    Public Function ToYaml
+        Dim yaml
+        yaml = yaml & "      - event: " & m_event.Raw & vbCrLf
+        yaml = yaml & "        action: " & m_action & vbCrLf
+        If Not IsNull(m_value) Then
+            yaml = yaml & "        value: " & m_value.Raw & vbCrLf
+        End If
+        ToYaml = yaml
+    End Function
+
+End Class
 ' Credits (coin play), after MPF's built-in credits mode.
 '
 ' EnableGlfCredits creates a mode called "credits" that runs from reset_complete. On
@@ -6673,47 +7038,6 @@ Function CreditsEventHandler(args)
     End If
 End Function
 
-
-Class GlfCounterControlEvent
-	Private m_event, m_action, m_value
-
-	Public Property Get EventName(): Set EventName = m_event: End Property
-    Public Property Let EventName(input)
-        Set m_event = (new GlfEvent)(input)
-    End Property
-
-    Public Property Get Action(): Action = m_action : End Property
-    Public Property Let Action(input): m_action = input : End Property
-
-    Public Property Get Value()
-        If Not IsNull(m_value) Then
-            Value = m_value.Value
-        Else
-            Value = 0
-        End If
-    End Property
-    Public Property Let Value(input)
-        Set m_value = CreateGlfInput(input)
-    End Property
-
-	Public default Function init()
-        m_event = Null
-        m_action = Empty
-        m_value = Null
-	    Set Init = Me
-	End Function
-
-    Public Function ToYaml
-        Dim yaml
-        yaml = yaml & "      - event: " & m_event.Raw & vbCrLf
-        yaml = yaml & "        action: " & m_action & vbCrLf
-        If Not IsNull(m_value) Then
-            yaml = yaml & "        value: " & m_value.Raw & vbCrLf
-        End If
-        ToYaml = yaml
-    End Function
-
-End Class
 
 
 Class GlfDofPlayer
@@ -8756,6 +9080,274 @@ Function StepLogicBlockEventHandler(args)
     End If
 End Function
 
+' Match: the end-of-game number match, after MPF's built-in match mode.
+'
+' EnableGlfMatch creates a mode called "match" that starts on game_ending and holds
+' the end of the game. Each player's match number is the last two digits of their
+' score. The mode draws a winning number, posts match_has_match or match_no_match
+' with every player's number, and ends after the display time.
+'
+' Awarding something for a match is left to the table: the credits mode can give a
+' credit on match_has_match.
+
+Dim glf_match : glf_match = Null
+
+Function EnableGlfMatch()
+    If Not IsNull(glf_match) Then
+        Set EnableGlfMatch = glf_match
+        Exit Function
+    End If
+    Dim match_mode : Set match_mode = CreateGlfMode("match", 1000)
+    match_mode.StartEvents = Array("game_ending")
+    match_mode.GameMode = False
+    match_mode.UseWaitQueue = True
+    Set glf_match = (new GlfMatch)(match_mode)
+    match_mode.AddModeSettings "match", glf_match
+    Set EnableGlfMatch = glf_match
+End Function
+
+Class GlfMatch
+
+    Private m_name
+    Private m_priority
+    Private m_base_device
+    Private m_debug
+
+    Private m_match_percentage
+    Private m_non_match_number_step
+    Private m_display_time_ms
+    Private m_end_match_event
+
+    Private m_running
+    Private m_winner_number
+    Private m_winners
+    Private m_forced_roll
+
+    Public Property Get Name() : Name = m_name : End Property
+    Public Property Get Mode() : Set Mode = m_base_device.Mode : End Property
+    Public Property Get WinnerNumber() : WinnerNumber = m_winner_number : End Property
+    Public Property Get Winners() : Winners = m_winners : End Property
+
+    ' Chance, in percent, that the winning number is one of the players' numbers
+    Public Property Let MatchPercentage(value) : m_match_percentage = value : End Property
+    ' Losing numbers are drawn from 0, step, 2 x step ... Scores usually end in 0, so the default is 10
+    Public Property Let NonMatchNumberStep(value) : m_non_match_number_step = value : End Property
+    Public Property Let DisplayTimeMs(value) : m_display_time_ms = value : End Property
+    Public Property Let EndMatchEvent(value)
+        If IsEmpty(value) Or IsNull(value) Then
+            m_end_match_event = Null
+        Else
+            Set m_end_match_event = (new GlfEvent)(value)
+        End If
+    End Property
+    ' For tests: a number from 0 to 99 used in place of the random roll for the next match
+    Public Property Let ForceRoll(value) : m_forced_roll = value : End Property
+
+    Public Property Let Debug(value)
+        m_debug = value
+        m_base_device.Debug = value
+    End Property
+    Public Property Get IsDebug()
+        If m_debug Then : IsDebug = 1 : Else : IsDebug = 0 : End If
+    End Property
+
+	Public default Function init(mode)
+        m_name = "match"
+        m_priority = mode.Priority
+        m_debug = False
+        m_match_percentage = 10
+        m_non_match_number_step = 10
+        m_display_time_ms = 2000
+        m_end_match_event = Null
+        m_running = False
+        m_winner_number = Empty
+        m_winners = 0
+        m_forced_roll = Empty
+        If Not glf_machine_vars.Exists("match_number") Then
+            With CreateMachineVar("match_number")
+                .InitialValue = 0
+                .ValueType = "int"
+                .Persist = False
+            End With
+        End If
+        Set m_base_device = (new GlfBaseModeDevice)(mode, "match", Me)
+        Set Init = Me
+	End Function
+
+    ' Called by the base mode device when the match mode starts
+    Public Sub Activate()
+        m_running = False
+        Dim player_count : player_count = UBound(glf_playerState.Keys()) + 1
+        If player_count = 0 Then
+            Log "No players. Skipping match."
+            m_base_device.Mode.StopMode
+            Exit Sub
+        End If
+        m_running = True
+
+        Dim match_numbers(), i, score
+        ReDim match_numbers(player_count - 1)
+        For i = 0 To player_count - 1
+            score = glf_playerState("PLAYER " & (i + 1))(GLF_SCORE)
+            match_numbers(i) = CLng(score - (100 * Int(score / 100)))
+        Next
+
+        ' Draw the winning number
+        Dim roll
+        If IsEmpty(m_forced_roll) Then
+            roll = Int(Rnd() * 100)
+        Else
+            roll = m_forced_roll
+            m_forced_roll = Empty
+        End If
+        If roll < m_match_percentage Then
+            m_winner_number = match_numbers(Int(Rnd() * player_count))
+        Else
+            m_winner_number = LosingNumber(match_numbers)
+        End If
+
+        m_winners = 0
+        Dim kwargs : Set kwargs = GlfKwargs()
+        Dim slots : slots = 4
+        If player_count > slots Then
+            slots = player_count
+        End If
+        For i = 0 To slots - 1
+            If i < player_count Then
+                kwargs.Add "match_number" & i, match_numbers(i)
+                kwargs.Add "match_number" & i & "_won", (match_numbers(i) = m_winner_number)
+                If match_numbers(i) = m_winner_number Then
+                    m_winners = m_winners + 1
+                End If
+            Else
+                kwargs.Add "match_number" & i, ""
+                kwargs.Add "match_number" & i & "_won", False
+            End If
+        Next
+        kwargs.Add "winner_number", m_winner_number
+        kwargs.Add "winners", m_winners
+
+        Dim previous : previous = glf_machine_vars("match_number").Value
+        glf_machine_vars("match_number").Value = m_winner_number
+        Glf_BcpSendMachineVar "match_number", m_winner_number, previous
+
+        If Not IsNull(m_end_match_event) Then
+            AddPinEventListener m_end_match_event.EventName, m_name & "_end_match", "MatchEventHandler", m_priority+m_end_match_event.Priority, Array("end_match", Me, m_end_match_event)
+        End If
+
+        If m_winners = 0 Then
+            Log "No match. Winning number: " & m_winner_number
+            Glf_BcpSendEvent "match_no_match", kwargs
+            DispatchPinEvent "match_no_match", kwargs
+        Else
+            Log "Match. Winning number: " & m_winner_number & ", winners: " & m_winners
+            Glf_BcpSendEvent "match_has_match", kwargs
+            DispatchPinEvent "match_has_match", kwargs
+        End If
+        SetDelay m_name & "_end", "MatchEventHandler", Array(Array("end", Me), Null), m_display_time_ms
+    End Sub
+
+    ' A number nobody has, from 0, step, 2 x step ...
+    Private Function LosingNumber(match_numbers)
+        Dim candidates, n, i, taken, step_size
+        step_size = m_non_match_number_step
+        If step_size < 1 Then
+            step_size = 1
+        End If
+        candidates = Array()
+        For n = 0 To 99 Step step_size
+            taken = False
+            For i = 0 To UBound(match_numbers)
+                If match_numbers(i) = n Then
+                    taken = True
+                End If
+            Next
+            If Not taken Then
+                ReDim Preserve candidates(UBound(candidates) + 1)
+                candidates(UBound(candidates)) = n
+            End If
+        Next
+        If UBound(candidates) = -1 Then
+            ' The players hold every number on offer. Fall back to any number nobody has.
+            For n = 0 To 99
+                taken = False
+                For i = 0 To UBound(match_numbers)
+                    If match_numbers(i) = n Then
+                        taken = True
+                    End If
+                Next
+                If Not taken Then
+                    ReDim Preserve candidates(UBound(candidates) + 1)
+                    candidates(UBound(candidates)) = n
+                End If
+            Next
+        End If
+        If UBound(candidates) = -1 Then
+            LosingNumber = match_numbers(0)
+        Else
+            LosingNumber = candidates(Int(Rnd() * (UBound(candidates) + 1)))
+        End If
+    End Function
+
+    Public Sub EndMatch()
+        If Not m_running Then
+            Exit Sub
+        End If
+        m_running = False
+        m_base_device.Mode.StopMode
+    End Sub
+
+    ' Called by the base mode device when the match mode stops
+    Public Sub Deactivate()
+        RemoveDelay m_name & "_end"
+        If Not IsNull(m_end_match_event) Then
+            RemovePinEventListener m_end_match_event.EventName, m_name & "_end_match"
+        End If
+        m_running = False
+    End Sub
+
+    Public Sub Enable()
+    End Sub
+
+    Public Sub Disable()
+    End Sub
+
+    Private Sub Log(message)
+        If m_debug = True Then
+            glf_debugLog.WriteToLog m_name, message
+        End If
+    End Sub
+
+    ' Lines for the mode_settings section of the exported match mode
+    Public Function ModeSettingsYaml()
+        ModeSettingsYaml = "  non_match_number_step: " & m_non_match_number_step & vbCrLf
+    End Function
+End Class
+
+Function MatchEventHandler(args)
+    Dim ownProps, kwargs : ownProps = args(0)
+    If IsObject(args(1)) Then
+        Set kwargs = args(1)
+    Else
+        kwargs = args(1)
+    End If
+    Dim evt : evt = ownProps(0)
+    Dim match_device : Set match_device = ownProps(1)
+    Select Case evt
+        Case "end"
+            match_device.EndMatch
+        Case "end_match"
+            If ownProps(2).Evaluate() Then
+                match_device.EndMatch
+            End If
+    End Select
+    If IsObject(args(1)) Then
+        Set MatchEventHandler = kwargs
+    Else
+        MatchEventHandler = kwargs
+    End If
+End Function
+
 Class GlfBaseModeDevice
 
     Private m_mode
@@ -8912,6 +9504,7 @@ Class Mode
     Private m_combo_switches
     Private m_timed_switches
     Private m_tilt
+    Private m_carousel
     Private m_high_score
     Private m_use_wait_queue
     Private m_mode_settings
@@ -9103,6 +9696,15 @@ Class Mode
         End If
     End Property
 
+    ' Turns the mode into a carousel: a list of items the player steps through and picks from
+    Public Property Get Carousel()
+        If IsNull(m_carousel) Then
+            Set m_carousel = (new GlfCarousel)(Me)
+            AddModeSettings "carousel", m_carousel
+        End If
+        Set Carousel = m_carousel
+    End Property
+
     Public Property Get TiltConfig()
         If Not IsNull(m_tilt) Then
             Set TiltConfig = m_tilt
@@ -9254,6 +9856,9 @@ Class Mode
         If Not IsNull(m_tilt) Then
             m_tilt.Debug = value
         End If
+        If Not IsNull(m_carousel) Then
+            m_carousel.Debug = value
+        End If
         If Not IsNull(m_lightplayer) Then
             m_lightplayer.Debug = value
         End If
@@ -9322,6 +9927,7 @@ Class Mode
         Set m_mode_settings = CreateObject("Scripting.Dictionary")
         m_lightplayer = Null
         m_tilt = Null
+        m_carousel = Null
         m_showplayer = Null
         m_segment_display_player = Null
         m_high_score = Null
