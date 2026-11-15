@@ -35,8 +35,10 @@ Class Mode
     Private m_combo_switches
     Private m_timed_switches
     Private m_tilt
+    Private m_carousel
     Private m_high_score
     Private m_use_wait_queue
+    Private m_mode_settings
     Private m_game_mode
 
     Public Property Get Name(): Name = m_name : End Property
@@ -203,6 +205,15 @@ Class Mode
         End If
     End Property
 
+    ' Turns the mode into a carousel: a list of items the player steps through and picks from
+    Public Property Get Carousel()
+        If IsNull(m_carousel) Then
+            Set m_carousel = (new GlfCarousel)(Me)
+            AddModeSettings "carousel", m_carousel
+        End If
+        Set Carousel = m_carousel
+    End Property
+
     Public Property Get TiltConfig()
         If Not IsNull(m_tilt) Then
             Set TiltConfig = m_tilt
@@ -283,6 +294,13 @@ Class Mode
         Next
     End Property
 
+    ' A device that belongs to one of the built-in modes (bonus, carousel, match...) registers
+    ' here. Its ModeSettingsYaml is written under mode_settings: when the mode is exported.
+    Public Sub AddModeSettings(name, device)
+        If Not m_mode_settings.Exists(name) Then
+            m_mode_settings.Add name, device
+        End If
+    End Sub
     Public Property Get UseWaitQueue(): UseWaitQueue = m_use_wait_queue: End Property
     Public Property Let UseWaitQueue(input): m_use_wait_queue = input: End Property
 
@@ -340,6 +358,9 @@ Class Mode
         Next
         If Not IsNull(m_tilt) Then
             m_tilt.Debug = value
+        End If
+        If Not IsNull(m_carousel) Then
+            m_carousel.Debug = value
         End If
         If Not IsNull(m_lightplayer) Then
             m_lightplayer.Debug = value
@@ -404,8 +425,10 @@ Class Mode
         Set m_timed_switches = CreateObject("Scripting.Dictionary")
 
         m_use_wait_queue = False
+        Set m_mode_settings = CreateObject("Scripting.Dictionary")
         m_lightplayer = Null
         m_tilt = Null
+        m_carousel = Null
         m_showplayer = Null
         m_segment_display_player = Null
         m_high_score = Null
@@ -506,6 +529,14 @@ Class Mode
 
         If m_use_wait_queue Then
             yaml = yaml & "  use_wait_queue: true" & vbCrLf
+        End If
+
+        If UBound(m_mode_settings.Keys)>-1 Then
+            yaml = yaml & vbCrLf
+            yaml = yaml & "mode_settings: " & vbCrLf
+            For Each child in m_mode_settings.Keys
+                yaml = yaml & m_mode_settings(child).ModeSettingsYaml()
+            Next
         End If
         
         If UBound(m_ballholds.Keys)>-1 Then
