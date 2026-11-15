@@ -17042,8 +17042,19 @@ Class GlfBallDevice
         Next
     End Sub
     Public Sub EjectAll()
-        EjectAvailableBalls m_present.Count
+        EjectAvailableBalls SupplyCount()
     End Sub
+    ' Counted balls plus balls on a switch that are still settling in. A kicker
+    ' whose EjectAllEvents is its own switch asks before its ball is counted.
+    Private Function SupplyCount()
+        Dim raw, key : Set raw = RawBalls()
+        SupplyCount = m_present.Count
+        For Each key In raw.Keys
+            If Not m_present.Exists(key) Then
+                If Not (m_left And key = m_active_key) Then SupplyCount = SupplyCount + 1
+            End If
+        Next
+    End Function
     Public Function EjectAvailableBalls(balls)
         ' Allocate only current, unreserved supply. Return how many NEW ejects
         ' were queued so callers can obtain any shortfall from another source.
@@ -17053,7 +17064,7 @@ Class GlfBallDevice
         Dim count, reserved : reserved = m_queue.Count
         ' A departed ball is still queued until confirmed, but no longer counted.
         If m_left Then reserved = reserved - 1
-        count = m_present.Count - reserved
+        count = SupplyCount() - reserved
         If count > requested Then count = requested
         Dim queued_before : queued_before = m_queue.Count
         If count > 0 Then EjectBalls count
