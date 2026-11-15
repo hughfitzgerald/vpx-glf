@@ -1,5 +1,9 @@
+' The game settings. A table sets them in its device configuration, before Glf_Init,
+' so the settings object is created once and kept.
 Function GlfGameSettings()
-    Set glf_game = (new GlfGame)()
+    If Not IsObject(glf_game) Then
+        Set glf_game = (new GlfGame)()
+    End If
 	Set GlfGameSettings = glf_game
 End Function
 
