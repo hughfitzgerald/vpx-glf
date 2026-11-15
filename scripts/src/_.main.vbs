@@ -173,7 +173,7 @@ Public Sub Glf_Init(ByRef table)
 		If glf_troughSize > 5 Then : swTrough6.DestroyBall : Set glf_ball6 = swTrough6.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1, glf_ball2, glf_ball3, glf_ball4, glf_ball5, glf_ball6) : Set glf_lastTroughSw = swTrough6 : End If
 		If glf_troughSize > 6 Then : swTrough7.DestroyBall : Set glf_ball7 = swTrough7.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1, glf_ball2, glf_ball3, glf_ball4, glf_ball5, glf_ball6, glf_ball7) : Set glf_lastTroughSw = swTrough7 : End If
 		If glf_troughSize > 7 Then : swTrough8.DestroyBall : Set glf_ball8 = swTrough8.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1, glf_ball2, glf_ball3, glf_ball4, glf_ball5, glf_ball6, glf_ball7, glf_ball8) : Set glf_lastTroughSw = swTrough8 : End If
-	Else If glf_troughStyle = "Default" Then
+	ElseIf glf_troughStyle = "Default" Then
 		If glf_troughSize > 0 Then : swTrough1.DestroyBall : Set glf_ball1 = swTrough1.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1) : Set glf_lastTroughSw = swTrough1 : End If
 		If glf_troughSize > 1 Then : swTrough2.DestroyBall : Set glf_ball2 = swTrough2.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1, glf_ball2) : Set glf_lastTroughSw = swTrough2 : End If
 		If glf_troughSize > 2 Then : swTrough3.DestroyBall : Set glf_ball3 = swTrough3.CreateSizedballWithMass(Ballsize / 2,Ballmass) : gBot = Array(glf_ball1, glf_ball2, glf_ball3) : Set glf_lastTroughSw = swTrough3 : End If
@@ -1182,7 +1182,11 @@ Public Function Glf_RunHandlers(i)
 		If Not IsEmpty(wait_for) Then
 			Dim remaining_handlers_keys : remaining_handlers_keys = glf_dispatch_handlers_await.Keys
 			Dim remaining_handlers_items : remaining_handlers_items = glf_dispatch_handlers_await.Items
-			AddPinEventListener wait_for, key & "_wait_for", "ContinueDispatchQueuePinEvent", 1000, Array(remaining_handlers_keys, remaining_handlers_items, null, wait_for, key & "_wait_for")
+			' Each paused dispatch needs its own continuation. A retry may wait
+			' on the same event while a cancelled attempt is still registered.
+			Dim continuation_key : continuation_key = key & "_wait_for_" & glf_dispatch_queue_int
+			glf_dispatch_queue_int = glf_dispatch_queue_int + 1
+			AddPinEventListener wait_for, continuation_key, "ContinueDispatchQueuePinEvent", 1000, Array(remaining_handlers_keys, remaining_handlers_items, null, wait_for, continuation_key)
 			glf_dispatch_handlers_await.RemoveAll
 			Exit For
 		End If
