@@ -49,6 +49,7 @@ nav:
           - 'Standup Target': standup-target.md
           - 'Segment Display': segment-display.md
     - Modes:
+          - 'Accruals and Sequences': accrual-sequence.md
           - 'Ball Hold': ball-hold.md
           - 'Ball Save': ball-save.md
           - 'Bonus': bonus.md
