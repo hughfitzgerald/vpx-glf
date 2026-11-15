@@ -5,11 +5,13 @@ on:
   push:
     paths:
       - "scripts/src/**"
+      - "scripts/tests/**"
       - "tests/**"
       - ".github/workflows/test-bed.yml"
   pull_request:
     paths:
       - "scripts/src/**"
+      - "scripts/tests/**"
       - "tests/**"
   workflow_dispatch:
 
@@ -51,6 +53,10 @@ jobs:
       - name: Run the test bed
         working-directory: scripts
         run: npm run test:headless
+
+      - name: Run the ball device unit tests
+        working-directory: scripts
+        run: npm run test:unit
 
       - name: Keep the run output
         if: always()
