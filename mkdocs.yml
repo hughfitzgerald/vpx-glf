@@ -65,6 +65,7 @@ nav:
           - 'Game and Players': game.md
           - 'High Score': high-score.md
           - 'Light Player': light-player.md
+          - 'Match': match.md
           - 'Modes': mode.md
           - 'Multiball': multiball.md
           - 'Multiball Locks': multiball-locks.md
