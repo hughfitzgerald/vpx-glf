@@ -1,7 +1,14 @@
 'At the end of a game the match mode compares the last two digits of the score with a
-'drawn number and posts the result.
+'drawn number and posts the result. The result is a queue event: a listener that waits
+'holds the end of the game until it is done.
 'Covers feat/match.
 TB_Scenario "match"
+
+'A listener that makes the match result wait for tb_match_go, like a show that blocks the queue
+Function TB_MatchWait(args)
+    args(1).Add "wait_for", "tb_match_go"
+    Set TB_MatchWait = args(1)
+End Function
 
 'Plays one ball of a one player game to its end. Returns the wait for the stage.
 Function TB_MatchPlayBall(last_ball)
@@ -73,10 +80,21 @@ Function Scenario_match(stage)
         Case 12
             SetPlayerState GLF_SCORE, 5570
             glf_match.ForceRoll = 99
-            Scenario_match = TB_MatchPlayBall(True)
+            AddPinEventListener "match_no_match", "tb_match_wait", "TB_MatchWait", 500, Null
+            TB_DrainBall
+            TB_WaitUntil "match mode starts", "glf_modes(""match"").GetValue(""active"") = True", 15000
         Case 13
-            Scenario_match = 500
+            'Far longer than the display time
+            Scenario_match = 2000
         Case 14
+            TB_Eq "match mode stays up while a listener waits", glf_modes("match").GetValue("active"), True
+            TB_Eq "the game has not ended yet", glf_gameStarted, True
+            TB_Post "tb_match_go"
+            TB_WaitUntil "game ends once the listener is done", "glf_gameStarted = False", 5000
+        Case 15
+            RemovePinEventListener "match_no_match", "tb_match_wait"
+            Scenario_match = 300
+        Case 16
             TB_Eq "no match posted", TB_Seen("match_no_match"), 1
             TB_Eq "still only one match", TB_Seen("match_has_match"), 1
             TB_Eq "no winners", TB_Kwarg("match_no_match", "winners"), 0
