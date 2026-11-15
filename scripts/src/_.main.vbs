@@ -1913,6 +1913,10 @@ Function Glf_GameVariable(value)
 			Glf_GameVariable = glf_game.BallsPerGame()
 		Case "balls_in_play"
 			Glf_GameVariable = glf_BIP
+		Case "max_players"
+			Glf_GameVariable = glf_game.MaxPlayers()
+		Case "num_players"
+			Glf_GameVariable = Glf_PlayerCount()
 	End Select
 End Function
 

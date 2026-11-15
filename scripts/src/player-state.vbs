@@ -11,18 +11,8 @@ Function GetPlayerState(key)
 End Function
 
 Function GetPlayerStateForPlayer(player, key)
-    dim p
-    Select Case player
-        Case 0:
-            p = "PLAYER 1"
-        Case 1:
-            p = "PLAYER 2"
-        Case 2:
-            p = "PLAYER 3"
-        Case 3:
-            p = "PLAYER 4"
-    End Select
-
+    ' player is zero based
+    Dim p : p = Getglf_PlayerName(player)
     If glf_playerState.Exists(p) Then
         GetPlayerStateForPlayer = glf_playerState(p)(key)
     Else
@@ -30,30 +20,22 @@ Function GetPlayerStateForPlayer(player, key)
     End If
 End Function
 
+' Zero based number of the player whose turn it is
 Function Getglf_currentPlayerNumber()
-    Select Case glf_currentPlayer
-        Case "PLAYER 1":
-            Getglf_currentPlayerNumber = 0
-        Case "PLAYER 2":
-            Getglf_currentPlayerNumber = 1
-        Case "PLAYER 3":
-            Getglf_currentPlayerNumber = 2
-        Case "PLAYER 4":
-            Getglf_currentPlayerNumber = 3
-    End Select
+    If IsNull(glf_currentPlayer) Or IsEmpty(glf_currentPlayer) Then
+        Exit Function
+    End If
+    Getglf_currentPlayerNumber = CInt(Mid(glf_currentPlayer, Len("PLAYER ") + 1)) - 1
 End Function
 
+' The key a player's state is stored under. player is zero based.
 Function Getglf_PlayerName(player)
-    Select Case player
-        Case 0:
-            Getglf_PlayerName = "PLAYER 1"
-        Case 1:
-            Getglf_PlayerName = "PLAYER 2"
-        Case 2:
-            Getglf_PlayerName = "PLAYER 3"
-        Case 3:
-            Getglf_PlayerName = "PLAYER 4"
-    End Select
+    Getglf_PlayerName = "PLAYER " & (CInt(player) + 1)
+End Function
+
+' How many players are in the current game
+Function Glf_PlayerCount()
+    Glf_PlayerCount = UBound(glf_playerState.Keys()) + 1
 End Function
 
 Function SetPlayerState(key, value)

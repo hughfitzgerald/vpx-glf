@@ -242,17 +242,7 @@ End Sub
 Sub Glf_BcpAddPlayer(playerNum)
     If useBcp Then
         bcpController.Send("player_added?player_num=int:"&playerNum)
-        dim p
-        Select Case playerNum
-            Case 1:
-                p = "PLAYER 1"
-            Case 2:
-                p = "PLAYER 2"
-            Case 3:
-                p = "PLAYER 3"
-            Case 4:
-                p = "PLAYER 4"
-        End Select
+        Dim p : p = "PLAYER " & playerNum
         Dim key, player_state
         Set player_state = glf_playerState(p)
         For Each key in player_state.Keys()

@@ -1913,6 +1913,10 @@ Function Glf_GameVariable(value)
 			Glf_GameVariable = glf_game.BallsPerGame()
 		Case "balls_in_play"
 			Glf_GameVariable = glf_BIP
+		Case "max_players"
+			Glf_GameVariable = glf_game.MaxPlayers()
+		Case "num_players"
+			Glf_GameVariable = Glf_PlayerCount()
 	End Select
 End Function
 
@@ -3339,17 +3343,7 @@ End Sub
 Sub Glf_BcpAddPlayer(playerNum)
     If useBcp Then
         bcpController.Send("player_added?player_num=int:"&playerNum)
-        dim p
-        Select Case playerNum
-            Case 1:
-                p = "PLAYER 1"
-            Case 2:
-                p = "PLAYER 2"
-            Case 3:
-                p = "PLAYER 3"
-            Case 4:
-                p = "PLAYER 4"
-        End Select
+        Dim p : p = "PLAYER " & playerNum
         Dim key, player_state
         Set player_state = glf_playerState(p)
         For Each key in player_state.Keys()
@@ -5435,6 +5429,7 @@ End Function
 Class GlfGame
 
     Private m_balls_per_game
+    Private m_max_players
 
     Public Property Get BallsPerGame()
         BallsPerGame = m_balls_per_game.Value()
@@ -5443,15 +5438,27 @@ Class GlfGame
         Set m_balls_per_game = CreateGlfInput(input)
     End Property
 
+    ' The most players one game can have. MPF's default is 4.
+    Public Property Get MaxPlayers()
+        MaxPlayers = m_max_players.Value()
+    End Property
+    Public Property Let MaxPlayers(input)
+        Set m_max_players = CreateGlfInput(input)
+    End Property
+
 	Public default Function init()
 
         Set m_balls_per_game = CreateGlfInput(3)
+        Set m_max_players = CreateGlfInput(4)
        
         Set Init = Me
 	End Function
 
     Public Function ToYaml()
         Dim yaml : yaml = ""
+        yaml = yaml & "game:" & vbCrLf
+        yaml = yaml & "  balls_per_game: " & m_balls_per_game.Raw & vbCrLf
+        yaml = yaml & "  max_players: " & m_max_players.Raw & vbCrLf
         ToYaml = yaml
     End Function
 
@@ -16793,57 +16800,47 @@ End Class
 '*****  Player Setup                               ****
 '******************************************************
 
+' Adds a player to the game, if the game has room and it is still ball 1.
+' player_add_request is a relay: any listener that returns False refuses the player
+' (the credits mode does, when there are not enough credits).
 Sub Glf_AddPlayer()
+    Dim player_count : player_count = Glf_PlayerCount()
+    If player_count >= glf_game.MaxPlayers() Then
+        glf_canAddPlayers = False
+        Exit Sub
+    End If
+    If player_count > 0 Then
+        If GetPlayerState(GLF_CURRENT_BALL) <> 1 Then
+            Exit Sub
+        End If
+    End If
+
+    If DispatchRelayPinEvent("player_add_request", True) = False Then
+        glf_debugLog.WriteToLog "Game", "Request to add a player was refused"
+        Exit Sub
+    End If
+
+    Dim new_number : new_number = player_count + 1
     Dim kwargs : Set kwargs = GlfKwargs()
-    With kwargs
-        .Add "num", -1
-    End With
-    Select Case UBound(glf_playerState.Keys())
-        Case -1:
-            kwargs("num") = 1
-            DispatchPinEvent "player_added", kwargs
-            glf_playerState.Add "PLAYER 1", Glf_InitNewPlayer()
-            SetPlayerStateByPlayer GLF_SCORE, 0, 0
-            SetPlayerStateByPlayer "number", 1, 0
-            Glf_BcpAddPlayer 1
-            glf_currentPlayer = "PLAYER 1"
-            Glf_BcpSendMachineVar "last_game_players", 1, 0
-            glf_machine_vars("last_game_players").Value = 1
-        Case 0:     
-            If GetPlayerState(GLF_CURRENT_BALL) = 1 Then
-                kwargs("num") = 2
-                DispatchPinEvent "player_added", kwargs
-                glf_playerState.Add "PLAYER 2", Glf_InitNewPlayer()
-                SetPlayerStateByPlayer GLF_SCORE, 0, 1
-                SetPlayerStateByPlayer "number", 2, 1
-                Glf_BcpAddPlayer 2
-                Glf_BcpSendMachineVar "last_game_players", 2, 1
-                glf_machine_vars("last_game_players").Value = 2
-            End If
-        Case 1:
-            If GetPlayerState(GLF_CURRENT_BALL) = 1 Then
-                kwargs("num") = 3
-                DispatchPinEvent "player_added", kwargs
-                glf_playerState.Add "PLAYER 3", Glf_InitNewPlayer()
-                SetPlayerStateByPlayer GLF_SCORE, 0, 2
-                SetPlayerStateByPlayer "number", 3, 2
-                Glf_BcpAddPlayer 3
-                Glf_BcpSendMachineVar "last_game_players", 3, 2
-                glf_machine_vars("last_game_players").Value = 3
-            End If     
-        Case 2:   
-            If GetPlayerState(GLF_CURRENT_BALL) = 1 Then
-                kwargs("num") = 4
-                DispatchPinEvent "player_added", kwargs
-                glf_playerState.Add "PLAYER 4", Glf_InitNewPlayer()
-                SetPlayerStateByPlayer GLF_SCORE, 0, 3
-                SetPlayerStateByPlayer "number", 4, 3
-                Glf_BcpAddPlayer 4
-                Glf_BcpSendMachineVar "last_game_players", 4, 3
-                glf_machine_vars("last_game_players").Value = 4
-            End If  
-            glf_canAddPlayers = False
-    End Select
+    kwargs.Add "num", new_number
+    kwargs.Add "number", new_number
+    DispatchPinEvent "player_will_add", kwargs
+    DispatchPinEvent "player_added", kwargs
+    glf_playerState.Add "PLAYER " & new_number, Glf_InitNewPlayer()
+    SetPlayerStateByPlayer GLF_SCORE, 0, player_count
+    SetPlayerStateByPlayer "number", new_number, player_count
+    Glf_BcpAddPlayer new_number
+    If new_number = 1 Then
+        glf_currentPlayer = "PLAYER 1"
+    End If
+    Glf_BcpSendMachineVar "last_game_players", new_number, player_count
+    glf_machine_vars("last_game_players").Value = new_number
+    If new_number = 2 Then
+        DispatchPinEvent "multiplayer_game", Null
+    End If
+    If new_number >= glf_game.MaxPlayers() Then
+        glf_canAddPlayers = False
+    End If
 End Sub
 
 Function Glf_InitNewPlayer()
@@ -16886,63 +16883,17 @@ End Function
 AddPinEventListener "request_to_start_game", "request_to_start_game_ball_controller", "Glf_BallController", 30, Null
 Function Glf_BallController(args)
     Dim balls_in_trough : balls_in_trough = 0
-    If glf_troughSize = 1 Then
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
+    Dim i, switch_count
+    ' An eight ball trough of the default style keeps its eighth ball in the drain
+    switch_count = glf_troughSize
+    If glf_troughSize = 8 And glf_troughStyle = "Default" Then
+        switch_count = 7
+        If Drain.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
     End If
-    If glf_troughSize = 2 Then
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 3 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 4 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough4.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 5 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough4.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough5.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 6 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough4.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough5.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough6.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 7 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough4.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough5.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough6.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough7.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-    End If
-    If glf_troughSize = 8 Then 
-        If swTrough1.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough2.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough3.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough4.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough5.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough6.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If swTrough7.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        If glf_troughStyle = "Default" Then
-            If Drain.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        Else If glf_troughStyle = "P3" Then
-            If swTrough8.BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
-        End If
-    End If
-  
+    For i = 1 To switch_count
+        If Eval("swTrough" & i).BallCntOver = 1 Then balls_in_trough = balls_in_trough + 1
+    Next
+
     If glf_troughSize <> balls_in_trough Then
         Glf_BallController = False
         Exit Function
@@ -16980,6 +16931,23 @@ End Sub
 
 Public Function Glf_DispatchGameStarted(args)
     DispatchPinEvent GLF_GAME_STARTED, Null
+    Glf_PostPlayerTurnStart
+End Function
+
+' player_turn_will_start, player_turn_starting (a queue event) and player_turn_started,
+' as in MPF. Posted when a player's turn begins, not for an extra ball.
+Sub Glf_PostPlayerTurnStart()
+    Dim kwargs : Set kwargs = Glf_PlayerTurnKwargs()
+    DispatchPinEvent "player_turn_will_start", kwargs
+    DispatchQueuePinEvent "player_turn_starting", kwargs
+    DispatchPinEvent "player_turn_started", kwargs
+End Sub
+
+Function Glf_PlayerTurnKwargs()
+    Dim kwargs : Set kwargs = GlfKwargs()
+    kwargs.Add "number", Getglf_currentPlayerNumber() + 1
+    kwargs.Add "player", Getglf_currentPlayerNumber() + 1
+    Set Glf_PlayerTurnKwargs = kwargs
 End Function
 
 
@@ -17000,6 +16968,13 @@ Function Glf_ReleaseBall(args)
     If Not IsNull(args) Then
         If args(0) = True Then
             kwargs.Add "new_ball", True
+            ' A new ball for the current player, as against a ball added to one in play
+            Dim ball_kwargs : Set ball_kwargs = GlfKwargs()
+            ball_kwargs.Add "ball", GetPlayerState(GLF_CURRENT_BALL)
+            ball_kwargs.Add "player", Getglf_currentPlayerNumber() + 1
+            ball_kwargs.Add "balls_remaining", glf_game.BallsPerGame() - GetPlayerState(GLF_CURRENT_BALL)
+            DispatchPinEvent "ball_will_start", ball_kwargs
+            DispatchQueuePinEvent "ball_starting", ball_kwargs
         End If
     End If
     DispatchQueuePinEvent "balldevice_trough_ball_eject_attempt", kwargs
@@ -17019,6 +16994,12 @@ Function Glf_TroughReleaseBall(args)
             If args(1)("new_ball") = True Then
                 glf_BIP = glf_BIP + 1
                 DispatchPinEvent GLF_BALL_STARTED, Null
+                If Glf_PlayerCount() = 1 Then
+                    DispatchPinEvent "single_player_ball_started", Null
+                Else
+                    DispatchPinEvent "multi_player_ball_started", Null
+                    DispatchPinEvent "player_" & (Getglf_currentPlayerNumber() + 1) & "_ball_started", Null
+                End If
                 If useBcp Then
                     bcpController.SendPlayerVariable GLF_CURRENT_BALL, GetPlayerState(GLF_CURRENT_BALL), GetPlayerState(GLF_CURRENT_BALL)-1
                     bcpController.SendPlayerVariable GLF_SCORE, GetPlayerState(GLF_SCORE), GetPlayerState(GLF_SCORE)
@@ -17108,28 +17089,32 @@ Function Glf_EndOfBall(args)
     
     SetPlayerState GLF_CURRENT_BALL, GetPlayerState(GLF_CURRENT_BALL) + 1
 
-    Dim previousPlayerNumber : previousPlayerNumber = Getglf_currentPlayerNumber()
-    Select Case glf_currentPlayer
-        Case "PLAYER 1":
-            If UBound(glf_playerState.Keys()) > 0 Then
-                glf_currentPlayer = "PLAYER 2"
-            End If
-        Case "PLAYER 2":
-            If UBound(glf_playerState.Keys()) > 1 Then
-                glf_currentPlayer = "PLAYER 3"
-            Else
-                glf_currentPlayer = "PLAYER 1"
-            End If
-        Case "PLAYER 3":
-            If UBound(glf_playerState.Keys()) > 2 Then
-                glf_currentPlayer = "PLAYER 4"
-            Else
-                glf_currentPlayer = "PLAYER 1"
-            End If
-        Case "PLAYER 4":
-            glf_currentPlayer = "PLAYER 1"
-    End Select
-    
+    ' The turn is over. The player only changes once these events have been handled,
+    ' so their listeners still see the player whose turn it was.
+    Dim kwargs : Set kwargs = Glf_PlayerTurnKwargs()
+    DispatchPinEvent "player_turn_will_end", kwargs
+    DispatchQueuePinEvent "player_turn_ending", kwargs
+    DispatchPinEvent "player_turn_ended", kwargs
+    DispatchPinEvent "glf_player_turn_complete", Null
+
+End Function
+
+'****************************
+' Next Player
+' Event Listeners:
+AddPinEventListener "glf_player_turn_complete", "glf_rotate_players", "Glf_RotatePlayers", 20, Null
+'
+'*****************************
+Function Glf_RotatePlayers(args)
+    If glf_gameStarted = False Or IsNull(glf_currentPlayer) Then
+        Exit Function
+    End If
+    Dim next_player : next_player = Getglf_currentPlayerNumber() + 1
+    If next_player >= Glf_PlayerCount() Then
+        next_player = 0
+    End If
+    glf_currentPlayer = Getglf_PlayerName(next_player)
+
     If GetPlayerState(GLF_CURRENT_BALL) > glf_game.BallsPerGame() Then
         Dim device
         For Each device in glf_ball_devices.Items()
@@ -17140,11 +17125,17 @@ Function Glf_EndOfBall(args)
         DispatchPinEvent "game_will_end", Null
         DispatchQueuePinEvent "game_ending", Null
     Else
-        SetDelay "end_of_ball_delay", "EndOfBallNextPlayer", Null, 1000 
+        SetDelay "end_of_ball_delay", "Glf_StartPlayerTurn", Null, 1000
     End If
-    
+End Function
 
-
+' The next player's turn: the turn events, then the ball
+Public Function Glf_StartPlayerTurn(args)
+    If glf_gameStarted = False Or IsNull(glf_currentPlayer) Then
+        Exit Function
+    End If
+    Glf_PostPlayerTurnStart
+    DispatchPinEvent GLF_NEXT_PLAYER, Null
 End Function
 
 '****************************
@@ -17612,18 +17603,8 @@ Function GetPlayerState(key)
 End Function
 
 Function GetPlayerStateForPlayer(player, key)
-    dim p
-    Select Case player
-        Case 0:
-            p = "PLAYER 1"
-        Case 1:
-            p = "PLAYER 2"
-        Case 2:
-            p = "PLAYER 3"
-        Case 3:
-            p = "PLAYER 4"
-    End Select
-
+    ' player is zero based
+    Dim p : p = Getglf_PlayerName(player)
     If glf_playerState.Exists(p) Then
         GetPlayerStateForPlayer = glf_playerState(p)(key)
     Else
@@ -17631,30 +17612,22 @@ Function GetPlayerStateForPlayer(player, key)
     End If
 End Function
 
+' Zero based number of the player whose turn it is
 Function Getglf_currentPlayerNumber()
-    Select Case glf_currentPlayer
-        Case "PLAYER 1":
-            Getglf_currentPlayerNumber = 0
-        Case "PLAYER 2":
-            Getglf_currentPlayerNumber = 1
-        Case "PLAYER 3":
-            Getglf_currentPlayerNumber = 2
-        Case "PLAYER 4":
-            Getglf_currentPlayerNumber = 3
-    End Select
+    If IsNull(glf_currentPlayer) Or IsEmpty(glf_currentPlayer) Then
+        Exit Function
+    End If
+    Getglf_currentPlayerNumber = CInt(Mid(glf_currentPlayer, Len("PLAYER ") + 1)) - 1
 End Function
 
+' The key a player's state is stored under. player is zero based.
 Function Getglf_PlayerName(player)
-    Select Case player
-        Case 0:
-            Getglf_PlayerName = "PLAYER 1"
-        Case 1:
-            Getglf_PlayerName = "PLAYER 2"
-        Case 2:
-            Getglf_PlayerName = "PLAYER 3"
-        Case 3:
-            Getglf_PlayerName = "PLAYER 4"
-    End Select
+    Getglf_PlayerName = "PLAYER " & (CInt(player) + 1)
+End Function
+
+' How many players are in the current game
+Function Glf_PlayerCount()
+    Glf_PlayerCount = UBound(glf_playerState.Keys()) + 1
 End Function
 
 Function SetPlayerState(key, value)
