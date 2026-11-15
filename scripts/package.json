@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node ../tests/run-tests.js",
     "test:headless": "node ../tests/run-tests.js --headless",
+    "test:unit": "node ../tests/run-tests.js --unit",
     "script-watcher": "grunt watch:vpx",
     "test:ball-device": "cscript //nologo tests\\ball-device-tests.vbs"
   },

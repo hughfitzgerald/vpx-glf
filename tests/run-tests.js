@@ -4,6 +4,7 @@
 //
 //   node tests/run-tests.js                 run every scenario in Visual Pinball
 //   node tests/run-tests.js --headless      run them without Visual Pinball (see below)
+//   node tests/run-tests.js --unit          run the ball device unit tests (scripts/tests)
 //   node tests/run-tests.js --only a,b      run the named scenarios
 //   node tests/run-tests.js --isolate       restart Visual Pinball for each scenario
 //   node tests/run-tests.js --list          list scenario names
@@ -58,6 +59,7 @@ function parseArgs(argv) {
         else if (arg === '--timeout') args.timeout = Number(argv[++i]) || 300;
         else if (arg === '--assemble') args.assemble = true;
         else if (arg === '--headless') args.headless = true;
+        else if (arg === '--unit') args.unit = true;
         else fail(`unknown option ${arg}`);
     }
     return args;
@@ -314,10 +316,60 @@ function scriptErrors() {
             || (index > 0 && /^\s+> /.test(line) && /script error/i.test(all[index - 1])));
 }
 
+// ---------- ball device unit tests ----------
+
+// Runs scripts/tests/ball-device-tests.vbs (upstream's ball device unit tests, written
+// for cscript on Windows) in glftest_host. The script is used as it is, apart from the
+// three things cscript gives it: its own location, WScript.Echo and WScript.Quit.
+function runUnitTests() {
+    const unitSource = path.join(scriptsDir, 'tests', 'ball-device-tests.vbs');
+    if (!fs.existsSync(unitSource)) fail(`${unitSource} not found`);
+    ensureHost();
+    const unitScript = path.join(workDir, 'unit.vbs');
+    const unitResults = path.join(workDir, 'unit-results.txt');
+    const emptyPrelude = path.join(workDir, 'unit-prelude.vbs');
+    const forVbs = (p) => p.replace(/\\/g, '/').replace(/"/g, '""');
+    const helpers = [
+        'Sub TbEcho(s)',
+        `    Dim f : Set f = CreateObject("Scripting.FileSystemObject").OpenTextFile("${forVbs(unitResults)}", 8, True)`,
+        '    f.WriteLine s',
+        '    f.Close',
+        'End Sub',
+        'Sub TbQuit(code)',
+        '    TbEcho "EXIT " & code',
+        'End Sub',
+    ].join('\n');
+    const text = fs.readFileSync(unitSource, 'utf8')
+        .replace('testDir = fso.GetParentFolderName(WScript.ScriptFullName)', 'testDir = ""')
+        .replace('root = fso.GetParentFolderName(testDir)', `root = "${forVbs(scriptsDir)}"`)
+        .replace(/"\\src\\([^"]*)"/g, (match, rest) => `"/src/${rest.replace(/\\/g, '/')}"`)
+        .replace(/WScript\.Echo/g, 'TbEcho')
+        .replace(/WScript\.Quit/g, 'TbQuit')
+        .replace('Option Explicit', `Option Explicit\n${helpers}`);
+    if (/WScript/.test(text)) fail('ball-device-tests.vbs uses a part of WScript this runner does not replace');
+    fs.writeFileSync(unitScript, text);
+    fs.writeFileSync(emptyPrelude, '');
+    fs.rmSync(unitResults, { force: true });
+    const result = spawnSync(hostBinary, [emptyPrelude, unitScript, '1', '1'], { cwd: workDir, encoding: 'utf8' });
+    const lines = fs.existsSync(unitResults) ? fs.readFileSync(unitResults, 'utf8').split(/\r?\n/).filter(Boolean) : [];
+    lines.filter((line) => !line.startsWith('EXIT ')).forEach((line) => console.log(line));
+    const passed = lines.some((line) => /^\d+ scenarios; \d+ assertions; 0 failures\.$/.test(line));
+    if (!passed) {
+        const errors = `${result.stdout || ''}${result.stderr || ''}`.split(/\r?\n/).filter((line) => /SCRIPT ERROR|^\s+> /.test(line));
+        errors.forEach((line) => console.log(line));
+        console.log('Ball device unit tests failed or did not reach their summary.');
+        process.exit(1);
+    }
+}
+
 // ---------- main ----------
 
 async function main() {
     const args = parseArgs(process.argv.slice(2));
+    if (args.unit) {
+        runUnitTests();
+        return;
+    }
     const names = scenarioNames();
 
     if (args.list) {

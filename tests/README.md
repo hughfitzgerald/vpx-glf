@@ -44,6 +44,7 @@ test bed; see `.github/workflows/test-bed.yml`.
 | --- | --- |
 | `npm test` | Run every scenario in Visual Pinball |
 | `npm run test:headless` | Run every scenario without Visual Pinball |
+| `npm run test:unit` | Run the ball device unit tests in `scripts/tests` (written upstream for `cscript` on Windows) in the same headless runner |
 | `npm test -- --only hold_basic,smoke_game` | Run the named scenarios |
 | `npm test -- --isolate` | Restart Visual Pinball for each scenario |
 | `npm test -- --list` | List scenario names |
