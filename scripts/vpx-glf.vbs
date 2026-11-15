@@ -16971,19 +16971,40 @@ Function Glf_ReleaseBall(args)
     Set kwargs = GlfKwargs()
     If Not IsNull(args) Then
         If args(0) = True Then
-            kwargs.Add "new_ball", True
-            ' A new ball for the current player, as against a ball added to one in play
+            ' A new ball for the current player, as against a ball added to one in play.
+            ' ball_starting is a queue event: the ball is served by its last listener,
+            ' Glf_BallStartingDone, so a listener that waits holds the ball back.
             Dim ball_kwargs : Set ball_kwargs = GlfKwargs()
             ball_kwargs.Add "ball", GetPlayerState(GLF_CURRENT_BALL)
             ball_kwargs.Add "player", Getglf_currentPlayerNumber() + 1
             ball_kwargs.Add "balls_remaining", glf_game.BallsPerGame() - GetPlayerState(GLF_CURRENT_BALL)
             DispatchPinEvent "ball_will_start", ball_kwargs
             DispatchQueuePinEvent "ball_starting", ball_kwargs
+            Exit Function
         End If
     End If
     DispatchQueuePinEvent "balldevice_trough_ball_eject_attempt", kwargs
 End Function
 
+
+'****************************
+' Serve the new ball once every ball_starting listener is done
+' Event Listeners:
+AddPinEventListener "ball_starting", "glf_ball_starting_done", "Glf_BallStartingDone", -1000, Null
+'
+'*****************************
+Function Glf_BallStartingDone(args)
+    If glf_gameStarted = True Then
+        Dim kwargs : Set kwargs = GlfKwargs()
+        kwargs.Add "new_ball", True
+        DispatchQueuePinEvent "balldevice_trough_ball_eject_attempt", kwargs
+    End If
+    If IsObject(args(1)) Then
+        Set Glf_BallStartingDone = args(1)
+    Else
+        Glf_BallStartingDone = args(1)
+    End If
+End Function
 
 '****************************
 ' Release Ball
