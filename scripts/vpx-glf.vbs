@@ -9084,8 +9084,9 @@ End Function
 '
 ' EnableGlfMatch creates a mode called "match" that starts on game_ending and holds
 ' the end of the game. Each player's match number is the last two digits of their
-' score. The mode draws a winning number, posts match_has_match or match_no_match
-' with every player's number, and ends after the display time.
+' score. The mode draws a winning number and posts match_has_match or match_no_match
+' with every player's number. Both are queue events, as in MPF: the mode ends once
+' every listener is done, so a show or slide that blocks the queue holds it open.
 '
 ' Awarding something for a match is left to the table: the credits mode can give a
 ' credit on match_has_match.
@@ -9122,6 +9123,7 @@ Class GlfMatch
     Private m_winner_number
     Private m_winners
     Private m_forced_roll
+    Private m_result_event
 
     Public Property Get Name() : Name = m_name : End Property
     Public Property Get Mode() : Set Mode = m_base_device.Mode : End Property
@@ -9132,6 +9134,7 @@ Class GlfMatch
     Public Property Let MatchPercentage(value) : m_match_percentage = value : End Property
     ' Losing numbers are drawn from 0, step, 2 x step ... Scores usually end in 0, so the default is 10
     Public Property Let NonMatchNumberStep(value) : m_non_match_number_step = value : End Property
+    ' The least time the mode stays up after the result, on top of any listener that waits
     Public Property Let DisplayTimeMs(value) : m_display_time_ms = value : End Property
     Public Property Let EndMatchEvent(value)
         If IsEmpty(value) Or IsNull(value) Then
@@ -9157,12 +9160,13 @@ Class GlfMatch
         m_debug = False
         m_match_percentage = 10
         m_non_match_number_step = 10
-        m_display_time_ms = 2000
+        m_display_time_ms = 0
         m_end_match_event = Null
         m_running = False
         m_winner_number = Empty
         m_winners = 0
         m_forced_roll = Empty
+        m_result_event = Empty
         If Not glf_machine_vars.Exists("match_number") Then
             With CreateMachineVar("match_number")
                 .InitialValue = 0
@@ -9235,16 +9239,32 @@ Class GlfMatch
             AddPinEventListener m_end_match_event.EventName, m_name & "_end_match", "MatchEventHandler", m_priority+m_end_match_event.Priority, Array("end_match", Me, m_end_match_event)
         End If
 
+        ' The result is a queue event. This mode listens last, so it hears of it only
+        ' after every other listener has finished, including any that made the event wait.
+        Dim result_event
         If m_winners = 0 Then
             Log "No match. Winning number: " & m_winner_number
-            Glf_BcpSendEvent "match_no_match", kwargs
-            DispatchPinEvent "match_no_match", kwargs
+            result_event = "match_no_match"
         Else
             Log "Match. Winning number: " & m_winner_number & ", winners: " & m_winners
-            Glf_BcpSendEvent "match_has_match", kwargs
-            DispatchPinEvent "match_has_match", kwargs
+            result_event = "match_has_match"
         End If
-        SetDelay m_name & "_end", "MatchEventHandler", Array(Array("end", Me), Null), m_display_time_ms
+        m_result_event = result_event
+        AddPinEventListener result_event, m_name & "_result_done", "MatchEventHandler", -1000, Array("result_done", Me)
+        Glf_BcpSendEvent result_event, kwargs
+        DispatchQueuePinEvent result_event, kwargs
+    End Sub
+
+    ' Every listener of the result event is done
+    Public Sub ResultDone()
+        If Not m_running Then
+            Exit Sub
+        End If
+        If m_display_time_ms > 0 Then
+            SetDelay m_name & "_end", "MatchEventHandler", Array(Array("end", Me), Null), m_display_time_ms
+        Else
+            EndMatch()
+        End If
     End Sub
 
     ' A number nobody has, from 0, step, 2 x step ...
@@ -9300,6 +9320,10 @@ Class GlfMatch
     ' Called by the base mode device when the match mode stops
     Public Sub Deactivate()
         RemoveDelay m_name & "_end"
+        If Not IsEmpty(m_result_event) Then
+            RemovePinEventListener m_result_event, m_name & "_result_done"
+            m_result_event = Empty
+        End If
         If Not IsNull(m_end_match_event) Then
             RemovePinEventListener m_end_match_event.EventName, m_name & "_end_match"
         End If
@@ -9336,6 +9360,8 @@ Function MatchEventHandler(args)
     Select Case evt
         Case "end"
             match_device.EndMatch
+        Case "result_done"
+            match_device.ResultDone
         Case "end_match"
             If ownProps(2).Evaluate() Then
                 match_device.EndMatch
