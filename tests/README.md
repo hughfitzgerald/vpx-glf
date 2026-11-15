@@ -165,6 +165,23 @@ not fixed yet. It is reported, but does not fail the run.
 Ball search is enabled but never starts on its own. A scenario starts one with
 `glf_ballsearch.Start 1`.
 
+### Features that only some GLF builds have
+
+`src/21_config_features.vbs` configures the newer features, one block each. A block that fails because the build under test has no such setting is skipped, so the rest of the suite still runs against an older build. A scenario for one of these starts with `TB_Require("<feature>")`, which fails it straight away when the feature is missing.
+
+| Feature | What is configured |
+| --- | --- |
+| `logic_blocks` | Mode `tb_logic` (start with `tb_start_logic`): accruals `acc` and `acc_keep`, sequences `seq` and `seq_gated` |
+| `bonus` | The bonus mode, with short delays. It runs at the end of every ball in every scenario; with nothing to count it only posts the total |
+| `game_players` | Up to three players, and mode `tb_ball_intro`, which holds the start of a ball for a player with `tb_intro` set |
+| `credits` | The credits mode on free play. A scenario posts `enable_credit_play`; the runner posts `enable_free_play` and `credits_reset` after every scenario |
+| `kickbacks` | Kickback `tb_kick` on switch `s_tb_kick`; enable with `tb_kick_on` |
+| `carousel` | Modes `tb_carousel` and `tb_carousel_empty` |
+| `attract` | The attract mode |
+| `match` | The match mode, with a short display time. `glf_match.ForceRoll` fixes the draw |
+
+`TB_Kwarg(event, key)` returns one argument of the last watched event of that name.
+
 ## Limits
 
 - The trough and devices are simulated, so this tests GLF's logic, not kicker
