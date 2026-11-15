@@ -135,4 +135,4 @@ git cherry-pick <commit id>
 | `feat/kickbacks` | `CreateGlfKickback(name)` |
 | `feat/carousel` | `.Carousel()` on a mode |
 | `feat/attract` | `EnableGlfAttract()` (builds on `feat/carousel`) |
-| `feat/match` | `EnableGlfMatch()`: the end-of-game match |
+| `feat/match` | `EnableGlfMatch()`: the end-of-game match (builds on `fix/queue-event-wait`) |
