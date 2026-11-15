@@ -56,6 +56,7 @@ All durations below are integer milliseconds. Count delays and `EjectEnableTime`
 | `MaxEjectAttempts` | 0 | Maximum attempts including the first; zero means unlimited. |
 | `BallMissingTimeout` | 20000 | Additional grace after an explicit confirmation timeout before declaring the ball missing. |
 | `IdleMissingBallTimeout` | 3000 | Time after a settled idle departure before declaring the ball missing. |
+| `WaitingEjectTimeout` | 3000 | How long an eject request made on an empty device waits for a ball, when none is settling in and none is expected (`IncomingBalls`). After that the request is dropped so it cannot eject a later, unrelated ball. Zero waits forever. |
 | `EjectSwitchIndex` | 0 | Zero-based entry in `BallSwitches` identifying the physical eject position. |
 | `EjectEnableTime` | 0 | When positive, callback receives `Null` to disable after this duration, or earlier when its attempt is cancelled/completed. |
 
