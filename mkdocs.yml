@@ -54,6 +54,7 @@ nav:
           - 'Bonus': bonus.md
           - 'Combo Switches': combo-switches.md
           - 'Counter': counter.md
+          - 'Credits': credits.md
           - 'DOF Player': dof-player.md
           - 'Event Player': event-player.md
           - 'Extra Ball': extra-ball.md
