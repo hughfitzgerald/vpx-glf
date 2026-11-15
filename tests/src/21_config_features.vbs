@@ -10,6 +10,7 @@ Dim tb_features : Set tb_features = CreateObject("Scripting.Dictionary")   'feat
 Sub TB_ConfigureFeatures()
     TB_Feature "logic_blocks", "TB_ConfigLogicBlocks"
     TB_Feature "bonus", "TB_ConfigBonus"
+    TB_Feature "game_players", "TB_ConfigGamePlayers"
 End Sub
 
 Sub TB_Feature(feature, config_sub)
@@ -76,3 +77,13 @@ Sub TB_ConfigBonus()
         End With
     End With
 End Sub
+
+'Up to three players, so a fourth is refused
+Sub TB_ConfigGamePlayers()
+    GlfGameSettings().MaxPlayers = 3
+End Sub
+
+'A relay listener that refuses whatever is asked. Scenarios add and remove it.
+Function TB_Refuse(args)
+    TB_Refuse = False
+End Function
