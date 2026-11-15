@@ -51,6 +51,7 @@ nav:
     - Modes:
           - 'Ball Hold': ball-hold.md
           - 'Ball Save': ball-save.md
+          - 'Bonus': bonus.md
           - 'Combo Switches': combo-switches.md
           - 'Counter': counter.md
           - 'DOF Player': dof-player.md
