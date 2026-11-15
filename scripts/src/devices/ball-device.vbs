@@ -74,6 +74,8 @@ Class GlfBallDevice
     Public Property Get Name(): Name = m_name: End Property
     Public Property Get Balls(): Balls = m_present.Count: End Property
     Public Property Get HasBall(): HasBall = (m_present.Count > 0): End Property
+    ' Number of balls the device can keep: one for each occupancy switch.
+    Public Property Get Capacity(): Capacity = UBound(m_ball_switches) + 1: End Property
     Public Property Get IncomingBalls(): IncomingBalls = m_incoming_balls: End Property
     Public Property Get IsReadyToReceive()
         IsReadyToReceive = False
