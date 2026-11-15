@@ -19,6 +19,7 @@ Class GlfBallDevice
     Private m_left, m_confirmed, m_return_seen, m_player_controlled_request
     Private m_count_token, m_recounting, m_stopped, m_coil_enabled, m_enable_token
     Private m_claimed_balls
+    Private m_waiting_eject_timeout, m_wait_deadline
 
     Public Default Function Init(name)
         m_name = "balldevice_" & name
@@ -64,6 +65,8 @@ Class GlfBallDevice
         m_stopped = False
         m_coil_enabled = False
         m_claimed_balls = 0
+        m_waiting_eject_timeout = 3000
+        m_wait_deadline = 0
         m_state = "idle"
         ' GLF queue events are asynchronous. The kick must be the final handler,
         ' after all higher-priority handlers (including wait_for blockers).
@@ -118,6 +121,7 @@ Class GlfBallDevice
     Public Property Let MaxEjectAttempts(value): m_max_attempts = Nonnegative(value): End Property
     Public Property Let BallMissingTimeout(value): m_missing_timeout = PositiveMs(value): End Property
     Public Property Let IdleMissingBallTimeout(value): m_idle_missing_timeout = PositiveMs(value): End Property
+    Public Property Let WaitingEjectTimeout(value): m_waiting_eject_timeout = Nonnegative(value): End Property
     Public Property Let EjectSwitchIndex(value): m_eject_switch = Nonnegative(value): End Property
     Public Property Let MechanicalEject(value)
         If CBool(value) And UBound(m_ball_switches) > 0 Then
@@ -557,7 +561,9 @@ Class GlfBallDevice
         Next
         If candidate = "" Then
             If m_present.Count = 0 Then
+                If m_state <> "waiting_for_ball" Then m_wait_deadline = GameTime + m_waiting_eject_timeout
                 m_state = "waiting_for_ball"
+                If m_waiting_eject_timeout > 0 Then Schedule "waiting_timeout", 0, m_wait_deadline - GameTime, "_waiting"
             Else
                 m_state = "waiting_for_position"
             End If
@@ -750,6 +756,10 @@ Class GlfBallDevice
             If token = m_enable_token Then EjectEnableComplete
             Exit Sub
         End If
+        If kind = "waiting_timeout" Then
+            DropWaitingRequests
+            Exit Sub
+        End If
         If kind = "pump" Then
             ' Pump has no captured request and only examines the current queue.
             Pump
@@ -794,6 +804,31 @@ Class GlfBallDevice
                     End If
                 End If
         End Select
+    End Sub
+    ' An eject request made while the device is empty waits for a ball. With
+    ' nothing here and nothing on its way it is dropped after
+    ' WaitingEjectTimeout, so it cannot eject some later, unrelated ball.
+    Private Sub DropWaitingRequests()
+        If m_state <> "waiting_for_ball" Or m_waiting_eject_timeout = 0 Then Exit Sub
+        If GameTime < m_wait_deadline Then
+            Schedule "waiting_timeout", 0, m_wait_deadline - GameTime, "_waiting"
+            Exit Sub
+        End If
+        Dim raw, id, data : Set raw = RawBalls()
+        If m_present.Count > 0 Or raw.Count > 0 Or m_incoming_balls > 0 Then
+            m_wait_deadline = GameTime + m_waiting_eject_timeout
+            Schedule "waiting_timeout", 0, m_waiting_eject_timeout, "_waiting"
+            Exit Sub
+        End If
+        For Each id In m_queue.Keys
+            data = m_queue(id)
+            If data(0) = "" Then m_queue.Remove id
+        Next
+        Log "Eject request dropped, device is empty. Pending=" & m_queue.Count
+        m_request = ""
+        m_attempt = 0
+        m_state = "idle"
+        SchedulePump 1
     End Sub
     Private Sub Schedule(kind, token, delay_ms, suffix)
         If delay_ms < 1 Then delay_ms = 1
@@ -887,6 +922,7 @@ Class GlfBallDevice
         RemoveDelay m_name & "_pump"
         RemoveDelay m_name & "_recount"
         RemoveDelay m_name & "_lost"
+        RemoveDelay m_name & "_waiting"
         m_count_token = m_count_token + 1
         m_queue.RemoveAll
         m_request = ""

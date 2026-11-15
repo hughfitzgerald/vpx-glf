@@ -41,6 +41,9 @@ End Sub
 - `IncomingBalls` is consumed on arrival. The built-in ball-save, multiball, and multiball-lock readiness checks prevent ball saves/multiballs from serving into a plunger whose previous launch is still awaiting confirmation.
 - A returned player-controlled launch waits for another player launch. If an automatic or explicit eject was already queued, spontaneous movement and switch bounce preserve that powered request and retry it when the ball returns. An explicit `Eject` or launch-button event can also upgrade a pending player launch, including during departure settling or confirmation, without queuing an extra future ball. Observed movement does not consume the powered attempt limit before the first kick. Mechanical confirmation listeners start at UnHit, so a confirmation before exit settling is retained; a return invalidates it. A launch-button event while empty does not arm a future ball.
 - An idle lost ball is tracked by identity and eventually emits missing-ball events; a different arriving ball is not mistaken for its return.
+- `EjectAll` and `EjectAvailableBalls` include a ball that is on a switch but still inside its entrance settling time. A kicker whose `EjectAllEvents` is its own switch event therefore ejects the ball once it has settled.
+- While the game is tilted GLF posts no switch events, but device occupancy and confirmation switches are still followed. A ball that arrives during a tilt is not offered to holds or locks, and every device except the default device ejects it.
+- The device counts the balls a ball hold or multiball lock has claimed. When one of them is reported missing, or leaves without GLF ejecting it, the hold lowers its count and a locked ball is added back to `glf_BIP`. Ball search does not eject from a device that is holding or locking balls.
 - `StopDevice` invalidates attempts and disables an enabled eject callback. Switch observations continue while stopped so `Reset` can recount. Reset clears queued eject requests; it does not create new requests or clear externally owned queue blockers.
 
 ## Timing and eject-position configuration
@@ -56,6 +59,7 @@ All durations below are integer milliseconds. Count delays and `EjectEnableTime`
 | `MaxEjectAttempts` | 0 | Maximum attempts including the first; zero means unlimited. |
 | `BallMissingTimeout` | 20000 | Additional grace after an explicit confirmation timeout before declaring the ball missing. |
 | `IdleMissingBallTimeout` | 3000 | Time after a settled idle departure before declaring the ball missing. |
+| `WaitingEjectTimeout` | 3000 | How long an eject request made on an empty device waits for a ball, when none is settling in and none is expected (`IncomingBalls`). After that the request is dropped so it cannot eject a later, unrelated ball. Zero waits forever. |
 | `EjectSwitchIndex` | 0 | Zero-based entry in `BallSwitches` identifying the physical eject position. |
 | `EjectEnableTime` | 0 | When positive, callback receives `Null` to disable after this duration, or earlier when its attempt is cancelled/completed. |
 
