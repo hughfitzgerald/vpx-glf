@@ -449,6 +449,10 @@ End Sub
 
 Sub TB_EndScenario()
     tb_cond = ""
+    'Leave coin play the way the next scenario expects it: free play and no credits.
+    'Both events do nothing in a build without the credits mode.
+    TB_Post "enable_free_play"
+    TB_Post "credits_reset"
     tb_cleanup_step = 0
     tb_cleanup_until = gametime
     tb_phase = "cleanup"
