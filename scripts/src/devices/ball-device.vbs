@@ -18,6 +18,7 @@ Class GlfBallDevice
     Private m_state, m_request, m_attempt, m_token, m_active_key, m_active_ball
     Private m_left, m_confirmed, m_return_seen, m_player_controlled_request
     Private m_count_token, m_recounting, m_stopped, m_coil_enabled, m_enable_token
+    Private m_claimed_balls
 
     Public Default Function Init(name)
         m_name = "balldevice_" & name
@@ -62,6 +63,7 @@ Class GlfBallDevice
         m_recounting = False
         m_stopped = False
         m_coil_enabled = False
+        m_claimed_balls = 0
         m_state = "idle"
         ' GLF queue events are asynchronous. The kick must be the final handler,
         ' after all higher-priority handlers (including wait_for blockers).
@@ -357,7 +359,14 @@ Class GlfBallDevice
             unclaimed = 0
         End If
         ' Preserve GLF's numeric relay contract and expected-arrival behaviour.
-        If unclaimed > 0 Then unclaimed = DispatchRelayPinEvent(m_name & "_ball_enter", 1)
+        If unclaimed > 0 Then
+            unclaimed = DispatchRelayPinEvent(m_name & "_ball_enter", 1)
+            If unclaimed < 1 Then
+                ' A ball hold or multiball lock is keeping this ball.
+                m_claimed_balls = m_claimed_balls + 1
+                If m_claimed_balls > m_present.Count Then m_claimed_balls = m_present.Count
+            End If
+        End If
         Log "Received ball " & key & ", unclaimed=" & unclaimed
         DispatchPinEvent m_name & "_ball_entered", Null
         ' A request queued while empty owns this arrival. Do not add an automatic
@@ -632,8 +641,12 @@ Class GlfBallDevice
         Dim raw : Set raw = RawBalls()
         If raw.Exists(m_active_key) Or SettleWait() > 0 Then Exit Sub
         Log "Eject succeeded, ball " & m_active_key
+        Dim unrequested : unrequested = m_player_controlled_request
         FinishRequest
         DispatchPinEvent m_name & "_ball_eject_success", Null
+        ' A ball GLF ejected is not missing: just keep the claimed count in step.
+        ' A ball that left by itself may be one a hold or lock was keeping.
+        ClaimedBallsLeft unrequested
     End Sub
     Private Sub FailAttempt(reason)
         If m_request = "" Then Exit Sub
@@ -752,7 +765,7 @@ Class GlfBallDevice
                         kwargs.Add "num_attempts", m_attempt
                         kwargs.Add "reason", "confirmation_missing"
                         DispatchPinEvent m_name & "_ball_eject_failed", kwargs
-                        ReportMissing m_active_key
+                        ReportMissing m_active_key, False
                         FinishRequest
                     End If
                 End If
@@ -777,21 +790,41 @@ Class GlfBallDevice
                     ' A return may already be visible but still inside debounce.
                     m_lost(key) = GameTime + SettleWait() + 1
                 Else
-                    ReportMissing key
+                    ReportMissing key, True
                     m_lost.Remove key
                 End If
             End If
         Next
         ScheduleLostCheck
     End Sub
-    Private Sub ReportMissing(key)
+    ' unrequested: the ball left without GLF ejecting it.
+    Private Sub ReportMissing(key, unrequested)
+        Dim claimed : claimed = LostClaimedBalls()
+        If Not unrequested Then claimed = 0
         Dim kwargs : Set kwargs = GlfKwargs()
         kwargs.Add "balls", 1
         kwargs.Add "name", m_name
         kwargs.Add "ball_id", key
+        kwargs.Add "claimed_balls", claimed
         DispatchPinEvent m_name & "_ball_missing", kwargs
         DispatchPinEvent "balldevice_ball_missing", kwargs
-        Log "Ball missing: " & key
+        Log "Ball missing: " & key & ", claimed: " & claimed
+        If claimed > 0 Then Glf_ClaimedBallMissing Replace(m_name, "balldevice_", "", 1, 1), claimed
+    End Sub
+    ' Number of balls a hold or lock was keeping that are no longer in the device.
+    Private Function LostClaimedBalls()
+        LostClaimedBalls = 0
+        If m_claimed_balls > m_present.Count Then
+            LostClaimedBalls = m_claimed_balls - m_present.Count
+            m_claimed_balls = m_present.Count
+        End If
+    End Function
+    Private Sub ClaimedBallsLeft(unrequested)
+        Dim claimed : claimed = LostClaimedBalls()
+        If unrequested And claimed > 0 Then
+            Log "Claimed ball left without being ejected: " & claimed
+            Glf_ClaimedBallMissing Replace(m_name, "balldevice_", "", 1, 1), claimed
+        End If
     End Sub
 
     Private Sub FireCallback(ball)
@@ -869,6 +902,55 @@ Class GlfBallDevice
         If m_debug Then glf_debugLog.WriteToLog m_name, message
     End Sub
 End Class
+
+'A ball that a ball hold or multiball lock was keeping has left its device without being ejected.
+'Held balls are still counted in glf_BIP, so the hold only lowers its own count. Locked balls are
+'not counted in glf_BIP, so a locked ball that is back on the playfield is added to it.
+Sub Glf_ClaimedBallMissing(device_name, balls)
+    Dim ball_hold, multiball_lock, lock_device, is_lock_device
+    For Each ball_hold in glf_ball_holds.Items()
+        balls = balls - ball_hold.BallMissing(device_name)
+    Next
+    If balls <= 0 Then
+        Exit Sub
+    End If
+    is_lock_device = False
+    For Each multiball_lock in glf_multiball_locks.Items()
+        For Each lock_device in multiball_lock.LockDevices
+            If lock_device = device_name Then
+                is_lock_device = True
+            End If
+        Next
+    Next
+    If is_lock_device = True And glf_gameStarted = True And glf_gameTilted = False And glf_BIP > 0 Then
+        glf_BIP = glf_BIP + balls
+        glf_debugLog.WriteToLog "Ball Device", "Locked ball left " & device_name & " without being ejected. BIP: " & glf_BIP
+    End If
+End Sub
+
+'True if the named device belongs to a ball hold that is holding balls, or to a multiball lock.
+Function Glf_BallDeviceKeepsBalls(device_name)
+    Glf_BallDeviceKeepsBalls = False
+    Dim ball_hold, multiball_lock, device
+    For Each ball_hold in glf_ball_holds.Items()
+        If ball_hold.GetValue("balls_held") > 0 Then
+            For Each device in ball_hold.HoldDevices
+                If device = device_name Then
+                    Glf_BallDeviceKeepsBalls = True
+                    Exit Function
+                End If
+            Next
+        End If
+    Next
+    For Each multiball_lock in glf_multiball_locks.Items()
+        For Each device in multiball_lock.LockDevices
+            If device = device_name Then
+                Glf_BallDeviceKeepsBalls = True
+                Exit Function
+            End If
+        Next
+    Next
+End Function
 
 Function BallDeviceEventHandler(args)
     Dim ownProps, evt, device, kwargs
