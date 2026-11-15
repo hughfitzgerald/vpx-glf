@@ -107,27 +107,21 @@ git cherry-pick <commit id>
 | `feat/sound-priority` | Priority-based cut-off on sound buses, with mode priority |
 | `feat/drop-target-getvalue` | `state` / `complete` placeholder values on drop targets |
 | `fix/sound-stop-timer` | Clear the pending stop timer when a sound is stopped |
-| `fix/trough-elseif` | Fix unclosed `Else If` blocks from the P3 trough change (table fails to compile without it) |
 | `feat/debug-ball-audit` | Debug-only check that `glf_BIP` matches where the balls are |
 | `fix/ball-hold-queue-duplicate-key` | Second ball held in the same device raised an error |
 | `fix/ball-hold-return-typo` | Hold returned Empty instead of the unclaimed count |
 | `fix/ball-hold-default-capacity` | `BallsToHold` defaults to the hold devices' capacity |
-| `fix/ball-device-failed-eject` | Device no longer sticks in its ejecting state when a kicked ball comes back |
-| `fix/ball-device-confirm-switch` | Eject target switch only confirms an eject that is in progress |
-| `fix/ball-device-eject-empty` | Eject request on an empty device is dropped after 3s instead of ejecting a later ball |
-| `feat/test-bed` | Automated test table under `tests/`; run it with `npm test` in `scripts/` (see `tests/README.md`) |
-| `fix/multiball-lock-release-count` | Multiball start releases only as many locked balls as it needs |
+| `fix/ball-device-eject-empty` | An eject request waiting on an empty device is dropped after `WaitingEjectTimeout` (3s) instead of ejecting a later ball |
+| `fix/ball-device-eject-all-settling` | `EjectAll` includes a ball still inside its entrance settling time, so a kicker that ejects from its own switch event works |
+| `feat/test-bed` | Automated test table under `tests/`; run it with `npm test` in `scripts/` (see `tests/README.md`). `npm run test:unit` runs upstream's ball device unit tests without Windows |
 | `fix/multiball-shoot-again` | Shoot again returns early when nothing needs saving and queues the right number of balls |
-| `fix/ball-device-ball-missing` | Holds and `glf_BIP` are corrected when a held or locked ball leaves without being ejected |
-| `fix/ball-search-claimed-balls` | Ball search no longer kicks out held and locked balls |
-| `fix/ball-device-ball-shift` | A ball rolling down inside a multi-switch device is no longer handled as a new ball |
+| `fix/ball-device-ball-missing` | Holds and `glf_BIP` are corrected when a held or locked ball goes missing or leaves without being ejected |
+| `fix/ball-search-claimed-balls` | Ball search no longer kicks out held and locked balls (builds on `fix/ball-device-ball-missing`) |
 | `fix/ball-hold-release-count` | A hold's count stays right when its device has already lost a ball |
 | `fix/ball-search-empty-categories` | Ball search finishes on tables with no auto-fire devices, drop targets or diverters |
-| `fix/ball-device-overlapping-ejects` | Eject requests that overlap are combined instead of the second replacing the first (builds on `fix/ball-device-failed-eject`) |
 | `fix/drain-after-ball-end` | A ball that drains after the last ball in play has drained no longer ends the ball twice |
 | `fix/ball-device-tilt` | Ball devices follow their own switches during a tilt and eject any ball that arrives |
 | `feat/ball-audit-extra-balls` | `glf_ball_audit_extra_balls` lets a table tell the ball audit about balls that did not come from the trough (builds on `feat/debug-ball-audit`) |
-| `fix/queue-event-wait` | One handler's wait in a queue event is no longer passed on to the handlers after it |
 | `feat/logic-blocks` | Accruals and sequences (`.Accruals(name)`, `.Sequences(name)` on a mode) |
 | `feat/bonus-mode` | `EnableGlfBonus()`: the end-of-ball bonus mode |
 | `feat/game-players` | `MaxPlayers`, the `player_add_request` relay, player turn events, `ball_starting` as a queue event that holds the ball; player and trough code de-duplicated |
@@ -135,4 +129,29 @@ git cherry-pick <commit id>
 | `feat/kickbacks` | `CreateGlfKickback(name)` |
 | `feat/carousel` | `.Carousel()` on a mode |
 | `feat/attract` | `EnableGlfAttract()` (builds on `feat/carousel`) |
-| `feat/match` | `EnableGlfMatch()`: the end-of-game match (builds on `fix/queue-event-wait`) |
+| `feat/match` | `EnableGlfMatch()`: the end-of-game match |
+
+## Upstream's ball device rewrite (November 2026)
+
+Upstream replaced the ball device (mpcarr/vpx-glf#24). This fork now uses that
+device. The branches above that touch the device (`fix/ball-hold-default-capacity`,
+`fix/ball-device-eject-empty`, `fix/ball-device-eject-all-settling`,
+`fix/ball-device-ball-missing`, `fix/ball-search-claimed-balls`,
+`fix/ball-device-tilt`) and `feat/test-bed` have had `main` merged in and their
+change re-applied on the new device.
+
+These branches are covered by upstream's rewrite and are no longer merged or
+needed. They can be deleted:
+
+| Branch | Covered by |
+| --- | --- |
+| `fix/trough-elseif` | Upstream fixed the `Else If` blocks |
+| `fix/ball-device-failed-eject` | A returning ball is recognised and the eject retried |
+| `fix/ball-device-confirm-switch` | Confirmation needs the ejected ball itself and an attempt in progress |
+| `fix/ball-device-ball-shift` | Balls are counted by identity across all switches |
+| `fix/ball-device-overlapping-ejects` | Eject requests are queued |
+| `fix/multiball-lock-release-count` | `EjectAvailableBalls` |
+| `fix/queue-event-wait` | Upstream consumes `wait_for` the same way |
+
+The other branches still start from the older `main`. Merge `main` into one
+before opening a pull request from it.
