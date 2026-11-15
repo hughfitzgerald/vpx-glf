@@ -12,6 +12,10 @@ Sub TB_ConfigureFeatures()
     TB_Feature "bonus", "TB_ConfigBonus"
     TB_Feature "game_players", "TB_ConfigGamePlayers"
     TB_Feature "credits", "TB_ConfigCredits"
+    TB_Feature "kickbacks", "TB_ConfigKickbacks"
+    TB_Feature "carousel", "TB_ConfigCarousel"
+    TB_Feature "attract", "TB_ConfigAttract"
+    TB_Feature "match", "TB_ConfigMatch"
 End Sub
 
 Sub TB_Feature(feature, config_sub)
@@ -82,6 +86,12 @@ End Sub
 'Up to three players, so a fourth is refused
 Sub TB_ConfigGamePlayers()
     GlfGameSettings().MaxPlayers = 3
+    'Holds the start of a ball, for a player who has tb_intro set
+    With CreateGlfMode("tb_ball_intro", 700)
+        .StartEvents = Array("ball_starting{current_player.tb_intro==1}")
+        .StopEvents = Array("tb_intro_done")
+        .UseWaitQueue = True
+    End With
 End Sub
 
 'A relay listener that refuses whatever is asked. Scenarios add and remove it.
@@ -108,5 +118,58 @@ Sub TB_ConfigCredits()
         With .Events("tb_award_credit")
             .Credits = 1
         End With
+    End With
+End Sub
+
+'A kickback that goes out once it has fired
+Dim tb_kick_actions : tb_kick_actions = 0
+
+Sub TB_ConfigKickbacks()
+    With CreateGlfKickback("tb_kick")
+        .Switch = "s_tb_kick"
+        .ActionCallback = "TB_KickAction"
+        .EnableEvents = Array("tb_kick_on")
+        .DisableEvents = Array("kickback_tb_kick_fired", "ball_will_end")
+    End With
+End Sub
+
+Sub TB_KickAction(args)
+    If args(0) = 1 Then
+        tb_kick_actions = tb_kick_actions + 1
+    End If
+End Sub
+
+'A carousel of three items plus one whose condition is never true, and a carousel with nothing to offer
+Sub TB_ConfigCarousel()
+    With CreateGlfMode("tb_carousel", 650)
+        .StartEvents = Array("tb_start_carousel")
+        .StopEvents = Array("tb_stop_carousel")
+        With .Carousel()
+            .SelectableItems = Array("one", "two", "never{game.balls_in_play==99}", "three")
+            .NextItemEvents = Array("tb_car_next")
+            .PreviousItemEvents = Array("tb_car_prev")
+            .SelectItemEvents = Array("tb_car_select")
+            .BlockEvents = Array("tb_car_block")
+            .ReleaseEvents = Array("tb_car_release")
+        End With
+    End With
+    With CreateGlfMode("tb_carousel_empty", 651)
+        .StartEvents = Array("tb_start_carousel_empty")
+        .StopEvents = Array("tb_stop_carousel_empty")
+        With .Carousel()
+            .SelectableItems = Array("never{game.balls_in_play==99}")
+        End With
+    End With
+End Sub
+
+Sub TB_ConfigAttract()
+    EnableGlfAttract()
+End Sub
+
+'End-of-game match with a short display time
+Sub TB_ConfigMatch()
+    With EnableGlfMatch()
+        .MatchPercentage = 50
+        .DisplayTimeMs = 300
     End With
 End Sub
