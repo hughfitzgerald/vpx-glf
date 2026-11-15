@@ -37,6 +37,7 @@ Class Mode
     Private m_combo_switches
     Private m_timed_switches
     Private m_tilt
+    Private m_carousel
     Private m_high_score
     Private m_use_wait_queue
     Private m_mode_settings
@@ -228,6 +229,15 @@ Class Mode
         End If
     End Property
 
+    ' Turns the mode into a carousel: a list of items the player steps through and picks from
+    Public Property Get Carousel()
+        If IsNull(m_carousel) Then
+            Set m_carousel = (new GlfCarousel)(Me)
+            AddModeSettings "carousel", m_carousel
+        End If
+        Set Carousel = m_carousel
+    End Property
+
     Public Property Get TiltConfig()
         If Not IsNull(m_tilt) Then
             Set TiltConfig = m_tilt
@@ -379,6 +389,9 @@ Class Mode
         If Not IsNull(m_tilt) Then
             m_tilt.Debug = value
         End If
+        If Not IsNull(m_carousel) Then
+            m_carousel.Debug = value
+        End If
         If Not IsNull(m_lightplayer) Then
             m_lightplayer.Debug = value
         End If
@@ -447,6 +460,7 @@ Class Mode
         Set m_mode_settings = CreateObject("Scripting.Dictionary")
         m_lightplayer = Null
         m_tilt = Null
+        m_carousel = Null
         m_showplayer = Null
         m_segment_display_player = Null
         m_high_score = Null

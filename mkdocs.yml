@@ -54,6 +54,7 @@ nav:
           - 'Ball Hold': ball-hold.md
           - 'Ball Save': ball-save.md
           - 'Bonus': bonus.md
+          - 'Carousel': carousel.md
           - 'Combo Switches': combo-switches.md
           - 'Counter': counter.md
           - 'Credits': credits.md
