@@ -162,6 +162,7 @@ not fixed yet. It is reported, but does not fail the run.
 | `tb_mb_sa` | `tb_enable_mb_sa` | Two-ball multiball with a 20-second shoot-again window; start it with `tb_start_mb_sa` |
 | `tb_mb3` | `tb_enable_mb3` | Three-ball multiball; start it with `tb_start_mb3` |
 | `tb_tilt` | every ball | Tilts on the first warning; post `s_tilt_warning_active` |
+| `tb_random` | `tb_start_random` | Random event players `tb_rnd_all`, `tb_rnd_cond`, `tb_rnd_diff`, `tb_rnd_one`, `tb_rnd_order` and `tb_rnd_fallback`, one per setting; each posts `<trigger>_a`, `_b` or `_c` |
 
 Ball search is enabled but never starts on its own. A scenario starts one with
 `glf_ballsearch.Start 1`.
