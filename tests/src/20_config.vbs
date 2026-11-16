@@ -179,6 +179,49 @@ Sub ConfigureGlfDevices()
         End With
     End With
 
+    'Random event players. Each trigger posts one of its events; see 84_random_event_player.vbs.
+    'tb_rnd_never is never set, so a condition on it never passes.
+    With CreateGlfMode("tb_random", 500)
+        .StartEvents = Array("tb_start_random")
+        .StopEvents = Array("tb_stop_random")
+        With .RandomEventPlayer()
+            'force_all and force_different, the defaults
+            With .EventName("tb_rnd_all")
+                .Add "tb_rnd_all_a", 1
+                .Add "tb_rnd_all_b", 1
+                .Add "tb_rnd_all_c", 1
+            End With
+            'force_all with one event whose condition fails
+            With .EventName("tb_rnd_cond")
+                .Add "tb_rnd_cond_a", 1
+                .Add "tb_rnd_cond_b", 1
+                .Add "tb_rnd_cond_c{current_player.tb_rnd_never == 1}", 1
+            End With
+            'force_different alone
+            With .EventName("tb_rnd_diff")
+                .ForceAll = False
+                .Add "tb_rnd_diff_a", 1
+                .Add "tb_rnd_diff_b", 1
+            End With
+            'force_different with a single event
+            With .EventName("tb_rnd_one")
+                .Add "tb_rnd_one_a", 1
+            End With
+            'Every round in the order the events were added
+            With .EventName("tb_rnd_order")
+                .DisableRandom = True
+                .Add "tb_rnd_order_a", 1
+                .Add "tb_rnd_order_b", 1
+                .Add "tb_rnd_order_c", 1
+            End With
+            'No event can play, so the fallback is posted
+            With .EventName("tb_rnd_fallback")
+                .Add "tb_rnd_fallback_a{current_player.tb_rnd_never == 1}", 1
+                .FallbackEvent = "tb_rnd_fallback_none"
+            End With
+        End With
+    End With
+
     'Features that only some GLF builds have. See 21_config_features.vbs.
     TB_ConfigureFeatures
 
