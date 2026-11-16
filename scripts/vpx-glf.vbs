@@ -20572,7 +20572,6 @@ Class GlfRandomEvent
     Private m_mode
     Private m_events
     Private m_weights
-    Private m_eventIndexMap
     Private m_fallback_event
     Private m_force_all
     Private m_force_different
@@ -20599,7 +20598,7 @@ Class GlfRandomEvent
         m_total_weights = 0
         Set m_events = CreateObject("Scripting.Dictionary")
         Set m_weights = CreateObject("Scripting.Dictionary")
-        Set m_eventIndexMap = CreateObject("Scripting.Dictionary")
+        Randomize
 	    Set Init = Me
 	End Function
 
@@ -20608,130 +20607,104 @@ Class GlfRandomEvent
         m_events.Add newEvent.Raw, newEvent
         m_weights.Add newEvent.Raw, weight
         m_total_weights = m_total_weights + weight
-        m_eventIndexMap.Add newEvent.Raw, UBound(m_events.Keys)
     End Sub
 
+    'Picks the event to post, following MPF's random_event_player:
+    '  - only events whose conditions pass can be picked; if none pass, the fallback event is posted
+    '  - force_all: every valid event plays once before any plays again
+    '  - force_different: the same event is never picked twice in a row, unless it is the only one
+    '  - disable_random: the first remaining event in the order they were added is picked
     Public Function GetNextRandomEvent()
+        GetNextRandomEvent = Empty
 
-        Dim valid_events, event_to_fire
-        Dim event_keys, event_items
-        Dim i, count, key
-        
+        Dim valid_events, candidates, key, chosenKey
         Set valid_events = CreateObject("Scripting.Dictionary")
-        event_keys = m_events.Keys
-        For i = 0 To UBound(event_keys)
-            If m_events(event_keys(i)).Evaluate Then
-                valid_events.Add event_keys(i), m_events(event_keys(i))
+        For Each key In m_events.Keys
+            If m_events(key).Evaluate() Then
+                valid_events.Add key, m_events(key)
             End If
         Next
-        event_to_fire = CheckFallback(valid_events)
-        If Not IsEmpty(event_to_fire) Then
-            GetNextRandomEvent = event_to_fire
+        If valid_events.Count = 0 Then
+            GetNextRandomEvent = m_fallback_event
             Exit Function
         End If
+
+        Set candidates = CopyEvents(valid_events)
 
         If m_force_all = True Then
-            event_keys = valid_events.Keys
-            event_items = valid_events.Items
-            valid_events.RemoveAll
-            For i=0 to UBound(event_keys)
-                If GetPlayerState("random_" & m_mode & "_" & m_key & "_" & m_eventIndexMap(event_keys(i))) = False Then
-                    valid_events.Add event_keys(i), event_items(i)
+            For Each key In valid_events.Keys
+                If GetPlayerState(PlayedKey(key)) = True Then
+                    candidates.Remove key
                 End If
             Next
-        End If
-
-        event_to_fire = CheckFallback(valid_events)
-        If Not IsEmpty(event_to_fire) Then
-            GetNextRandomEvent = event_to_fire
-            Exit Function
-        End If
-
-        If m_force_different = True Then
-            If valid_events.Exists(GetPlayerState("random_" & m_mode & "_" & m_key & "_last")) Then
-                valid_events.Remove GetPlayerState("random_" & m_mode & "_" & m_key & "_last")
-            End If
-        End If
-
-        event_to_fire = CheckFallback(valid_events)
-        If Not IsEmpty(event_to_fire) Then
-            GetNextRandomEvent = event_to_fire
-            Exit Function
-        End If
-
-        If UBound(valid_events.Keys) = -1 Then
-            GetNextRandomEvent = Empty
-            Exit Function
-        End If
-
-        'Random Selection From remaining valid events
-        Dim chosenKey
-        If m_disable_random = False Then
-            Dim total_weight
-            For Each key In valid_events.Keys
-                total_weight = total_weight + m_weights(key)
-            Next
-
-            Randomize
-            'randomIdx = Int(Rnd() * (UBound(valid_events.Keys)-LBound(valid_events.Keys) + 1) + LBound(valid_events.Keys))
-            Dim randVal
-            randVal = Rnd() * total_weight
-            Dim cumulativeWeight
-            cumulativeWeight = 0
-            
-            For Each key In valid_events.Keys
-                cumulativeWeight = cumulativeWeight + m_weights(key)
-                If randVal <= cumulativeWeight Then
-                    chosenKey = key
-                    Exit For
-                End If
-            Next
-
-
-        Else
-            event_keys = m_events.Keys
-            count = 0
-            For i = 0 To UBound(event_keys)
-                If GetPlayerState("random_" & m_mode & "_" & m_key & "_" & m_events(event_keys(i)).Raw) = True Then
-                    If valid_events.Exists(m_events(event_keys(i)).Raw) Then
-                        valid_events.Remove m_events(event_keys(i)).Raw
+            If candidates.Count = 0 Then
+                'Every valid event has played, so a new round starts
+                For Each key In m_events.Keys
+                    If GetPlayerState(PlayedKey(key)) = True Then
+                        SetPlayerState PlayedKey(key), False
                     End If
-                End If
-            Next
-            Dim valid_event_keys : valid_event_keys = valid_events.keys()
-            chosenKey = valid_event_keys(0)
-        End If
-        
-        SetPlayerState "random_" & m_mode & "_" & m_key & "_last", valid_events(chosenKey).Raw
-        SetPlayerState "random_" & m_mode & "_" & m_key & "_" & valid_events(chosenKey).Raw, True
-
-        event_keys = m_events.Keys
-        count = 0
-        For i = 0 To UBound(event_keys)
-            If GetPlayerState("random_" & m_mode & "_" & m_key & "_" & m_events(event_keys(i)).Raw) = True Then
-                count = count + 1
+                Next
+                Set candidates = CopyEvents(valid_events)
             End If
-        Next
-        If count = (UBound(event_keys) + 1) Then
-            For i = 0 To UBound(event_keys)
-                SetPlayerState "random_" & m_mode & "_" & m_key & "_" & m_events(event_keys(i)).Raw, False
-            Next
         End If
 
-        GetNextRandomEvent = valid_events(chosenKey).EventName
+        If m_force_different = True And candidates.Count > 1 Then
+            Dim last_event : last_event = GetPlayerState(LastKey())
+            If candidates.Exists(last_event) Then
+                candidates.Remove last_event
+            End If
+        End If
 
+        If m_disable_random = True Then
+            chosenKey = candidates.Keys()(0)
+        Else
+            chosenKey = WeightedChoice(candidates)
+        End If
+
+        SetPlayerState LastKey(), chosenKey
+        If m_force_all = True Then
+            SetPlayerState PlayedKey(chosenKey), True
+        End If
+
+        GetNextRandomEvent = m_events(chosenKey).EventName
     End Function
 
-    Public Function CheckFallback(valid_events)
-        If UBound(valid_events.Keys()) = -1 Then
-            If Not IsEmpty(m_fallback_event) Then
-                CheckFallback = m_fallback_event
-            Else
-                CheckFallback = Empty
-            End If
-        Else
-            CheckFallback = Empty
+    Private Function WeightedChoice(candidates)
+        Dim key, total_weight, cumulative_weight, rand_val
+        total_weight = 0
+        For Each key In candidates.Keys
+            total_weight = total_weight + m_weights(key)
+        Next
+        If total_weight <= 0 Then
+            WeightedChoice = candidates.Keys()(Int(Rnd() * candidates.Count))
+            Exit Function
         End If
+
+        rand_val = Rnd() * total_weight
+        cumulative_weight = 0
+        For Each key In candidates.Keys
+            cumulative_weight = cumulative_weight + m_weights(key)
+            WeightedChoice = key
+            If rand_val < cumulative_weight Then
+                Exit Function
+            End If
+        Next
+    End Function
+
+    Private Function CopyEvents(events)
+        Dim copy, key : Set copy = CreateObject("Scripting.Dictionary")
+        For Each key In events.Keys
+            copy.Add key, events(key)
+        Next
+        Set CopyEvents = copy
+    End Function
+
+    Private Function LastKey()
+        LastKey = "random_" & m_mode & "_" & m_key & "_last"
+    End Function
+
+    Private Function PlayedKey(event_key)
+        PlayedKey = "random_" & m_mode & "_" & m_key & "_played_" & event_key
     End Function
 
     Public Function ToYaml
