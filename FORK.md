@@ -120,6 +120,7 @@ git cherry-pick <commit id>
 | `fix/ball-hold-release-count` | A hold's count stays right when its device has already lost a ball |
 | `fix/ball-search-empty-categories` | Ball search finishes on tables with no auto-fire devices, drop targets or diverters |
 | `fix/drain-after-ball-end` | A ball that drains after the last ball in play has drained no longer ends the ball twice |
+| `fix/random-event-player` | Random event player `ForceAll` plays every valid event once per round and `ForceDifferent` never repeats the last event unless it is the only one; already on upstream's current `main` |
 | `fix/ball-device-tilt` | Ball devices follow their own switches during a tilt and eject any ball that arrives |
 | `feat/ball-audit-extra-balls` | `glf_ball_audit_extra_balls` lets a table tell the ball audit about balls that did not come from the trough (builds on `feat/debug-ball-audit`) |
 | `feat/logic-blocks` | Accruals and sequences (`.Accruals(name)`, `.Sequences(name)` on a mode) |
