@@ -665,7 +665,7 @@ Public Sub Glf_Init(ByRef table)
 	With CreateMachineVar("last_game_players")
         .InitialValue = 0
         .ValueType = "int"
-        .Persist = False
+        .Persist = True
     End With
 
 	If Not IsNull(glf_highscore) Then
