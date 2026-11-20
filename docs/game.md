@@ -52,6 +52,8 @@ Before a player is added GLF posts the **player_add_request** relay. A listener 
 
 `number` counts players from 1. The turn events are not posted for an extra ball, because the turn carries on. The current player only changes after the turn-end events have been handled, so their listeners still see the player whose turn it was.
 
+The `ball` player variable works as in MPF. It goes up when the player's next turn starts, between `player_turn_starting` and `player_turn_started`, so the turn-end events and the pause before the next ball still show the ball that just finished. The game ends when the last player has finished ball `balls_per_game`.
+
 ## Conditions
 
 `game.max_players` and `game.num_players` can be used in conditions, alongside `game.balls_per_game`, `game.balls_in_play` and `game.tilted`.
