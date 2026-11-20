@@ -131,6 +131,7 @@ git cherry-pick <commit id>
 | `feat/carousel` | `.Carousel()` on a mode |
 | `feat/attract` | `EnableGlfAttract()` (builds on `feat/carousel`) |
 | `feat/match` | `EnableGlfMatch()`: the end-of-game match |
+| `fix/ball-number-at-turn-start` | The `ball` player variable goes up when the next turn starts, as in MPF, and the game ends when the last player finishes ball `balls_per_game` (builds on `feat/game-players`) |
 
 ## Upstream's ball device rewrite (November 2026)
 
